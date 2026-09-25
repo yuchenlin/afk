@@ -1,0 +1,21 @@
+# Xcode / Swift
+.DS_Store
+/.build/
+/Packages/
+xcuserdata/
+*.xcuserstate
+DerivedData/
+.swiftpm/
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+*.xcworkspace/xcuserdata/
+# Secrets
+.env
+.env.*
+!.env.example
+**/Secrets.plist
+**/APIKey*
+# Audio / eval artifacts
+eval/recordings/
+*.wav
+*.m4a
+*.pcm

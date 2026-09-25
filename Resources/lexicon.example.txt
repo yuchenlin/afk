@@ -1,0 +1,13 @@
+# One term per line. Loaded as Grok STT key terms (max 100) + polish hints.
+# Lines starting with # are ignored.
+
+LoRA
+GRPO
+xAI
+Grok
+H1B
+Model Y
+CUDA
+Transformer
+Attention
+AFK
