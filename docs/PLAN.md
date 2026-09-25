@@ -55,7 +55,7 @@ Do **not** use a large LLM as ASR — latency and cost collapse.
 
 Rough personal cost @ 20 min/day streaming ≈ **$2/user/month** STT.
 
-**Security:** never embed `XAI_API_KEY` in the shipping Mac/iOS binary; use a small authenticated proxy (e.g. Worker) for production.
+**Security:** never embed `XAI_API_KEY_VOICE` in the shipping Mac/iOS binary; use a small authenticated proxy (e.g. Worker) for production.
 
 ### Backup: Fun-ASR / Qwen3-ASR (Alibaba)
 
@@ -71,10 +71,10 @@ Shared: audio pipeline + STT clients + lexicon + polish. **Not** one UI.
 
 ### macOS (MVP)
 
-Default hotkey is **Fn** (same muscle memory as Typeless / Scribe), not Right Option.
+Default hotkey is **⌘G**, configurable from the menu (Fn, or any recorded combo). Fn stays available for Typeless / Scribe muscle memory. A quick ⌘G tap is replayed to the app so Find Next keeps working.
 
 1. Menu bar app (`LSUIElement`)
-2. Hold **Fn** (Typeless-compatible) → record; release → finalize
+2. Hold the shortcut (default **⌘G**) → record; release → finalize
 3. Thin streaming strip on screen edge
 4. Insert via Accessibility; fallback Cmd+V
 5. Permissions: Microphone + Accessibility

@@ -19,3 +19,5 @@ eval/recordings/
 *.wav
 *.m4a
 *.pcm
+# Build output
+/AFK.app/

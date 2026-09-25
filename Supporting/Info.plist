@@ -23,6 +23,6 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>AFK records while you hold Fn so it can turn speech into text at the caret.</string>
+	<string>AFK records while you hold its shortcut so it can turn speech into text at the caret.</string>
 </dict>
 </plist>
