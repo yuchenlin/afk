@@ -7,6 +7,8 @@ public struct TranscriptEntry: Codable, Identifiable, Equatable, Sendable {
     public let id: UUID
     public let date: Date
     public let text: String
+    /// The unpolished transcript, when `text` was polished from it.
+    public let rawText: String?
     /// Seconds of audio recorded.
     public let duration: TimeInterval?
     /// App that was frontmost when the transcript arrived (where it was pasted).
@@ -17,6 +19,7 @@ public struct TranscriptEntry: Codable, Identifiable, Equatable, Sendable {
         id: UUID = UUID(),
         date: Date = Date(),
         text: String,
+        rawText: String? = nil,
         duration: TimeInterval? = nil,
         appName: String? = nil,
         pasted: Bool
@@ -24,6 +27,7 @@ public struct TranscriptEntry: Codable, Identifiable, Equatable, Sendable {
         self.id = id
         self.date = date
         self.text = text
+        self.rawText = rawText
         self.duration = duration
         self.appName = appName
         self.pasted = pasted
@@ -62,13 +66,14 @@ public final class HistoryStore: ObservableObject {
         save()
     }
 
-    /// Case- and accent-insensitive match on the text or app name; empty query returns all.
+    /// Case- and accent-insensitive match on the text, original text, or app name; empty query returns all.
     public func search(_ query: String) -> [TranscriptEntry] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return entries }
         let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
         return entries.filter {
             $0.text.range(of: q, options: options) != nil
+                || ($0.rawText?.range(of: q, options: options) != nil)
                 || ($0.appName?.range(of: q, options: options) != nil)
         }
     }

@@ -24,7 +24,11 @@ public final class ListeningOverlay {
     }
 
     public func showTranscribing() {
-        show(.transcribing, autoHideAfter: nil)
+        show(.working("Transcribing…"), autoHideAfter: nil)
+    }
+
+    public func showPolishing() {
+        show(.working("Polishing…"), autoHideAfter: nil)
     }
 
     /// Small dimmed hint after the timer (e.g. how to finish hands-free recording).
@@ -141,7 +145,7 @@ final class OverlayModel: ObservableObject {
     enum State {
         case hidden
         case listening(since: Date)
-        case transcribing
+        case working(String)
         case notice(symbol: String, tint: Color, text: String)
     }
 
@@ -201,12 +205,12 @@ private struct OverlayView: View {
                     }
                 }
             }
-        case .transcribing:
+        case let .working(label):
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
                     .colorScheme(.dark)
-                Text("Transcribing…")
+                Text(label)
             }
         case let .notice(symbol, tint, text):
             HStack(spacing: 8) {

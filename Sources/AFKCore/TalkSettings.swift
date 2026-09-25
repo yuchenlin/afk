@@ -14,24 +14,28 @@ public struct TalkSettings: Equatable, Sendable {
     public var autoStopAfterPause = false
     /// Core Audio device UID; nil means the system default input.
     public var inputDeviceUID: String?
+    public var outputStyle: OutputStyle = .polished
 
     public init() {}
 
     static let modeKey = "talkMode"
     static let autoStopKey = "autoStopAfterPause"
     static let inputDeviceKey = "inputDeviceUID"
+    static let outputStyleKey = "outputStyle"
 
     public static func load(from defaults: UserDefaults = .standard) -> TalkSettings {
         var settings = TalkSettings()
         settings.mode = defaults.string(forKey: modeKey).flatMap(TalkMode.init(rawValue:)) ?? .hold
         settings.autoStopAfterPause = defaults.bool(forKey: autoStopKey)
         settings.inputDeviceUID = defaults.string(forKey: inputDeviceKey)
+        settings.outputStyle = defaults.string(forKey: outputStyleKey).flatMap(OutputStyle.init(rawValue:)) ?? .polished
         return settings
     }
 
     public func save(to defaults: UserDefaults = .standard) {
         defaults.set(mode.rawValue, forKey: Self.modeKey)
         defaults.set(autoStopAfterPause, forKey: Self.autoStopKey)
+        defaults.set(outputStyle.rawValue, forKey: Self.outputStyleKey)
         if let inputDeviceUID {
             defaults.set(inputDeviceUID, forKey: Self.inputDeviceKey)
         } else {

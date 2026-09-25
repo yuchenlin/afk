@@ -38,7 +38,7 @@ AFK only uses `XAI_API_KEY_VOICE`: from its environment when launched from a she
 
 ## Diagnostics
 
-`log stream --predicate 'subsystem == "xyz.yuchenlin.afk"'` shows each step (device, stream ready, bytes sent, result). Launch options run the talk flow without pasting or sending key presses: `open /Applications/AFK.app --args --self-test` (3 s test), `--self-test-hold`, `--self-test-handsfree`, `--self-test-cancel`, `--self-test-autostop`. Real shortcut presses during a self-test still paste normally.
+`log stream --predicate 'subsystem == "xyz.yuchenlin.afk"'` shows each step (device, stream ready, bytes sent, result). Launch options run the talk flow without pasting or sending key presses: `open /Applications/AFK.app --args --self-test` (3 s test), `--self-test-hold`, `--self-test-handsfree`, `--self-test-cancel`, `--self-test-autostop`, `--self-test-polish [text]` (runs the polish step on a sample; with no chat access it shows the fallback). Real shortcut presses during a self-test still paste normally.
 
 ## First-run tip
 

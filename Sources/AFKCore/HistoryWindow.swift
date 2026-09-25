@@ -88,6 +88,9 @@ private struct HistoryView: View {
                         .tag(entry.id)
                         .contextMenu {
                             Button("Copy") { copy([entry]) }
+                            if let raw = entry.rawText {
+                                Button("Copy Original (Before Polish)") { copyText(raw) }
+                            }
                             Button("Paste into Previous App") { paste(entry.text) }
                             Divider()
                             Button("Delete") { delete([entry.id]) }
@@ -142,8 +145,12 @@ private struct HistoryView: View {
 
     private func copy(_ entries: [TranscriptEntry]) {
         guard !entries.isEmpty else { return }
+        copyText(entries.map(\.text).joined(separator: "\n\n"))
+    }
+
+    private func copyText(_ text: String) {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(entries.map(\.text).joined(separator: "\n\n"), forType: .string)
+        NSPasteboard.general.setString(text, forType: .string)
         copiedAt = Date()
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.1) { copiedAt = copiedAt }
     }
@@ -162,6 +169,13 @@ private struct HistoryRow: View {
             Text(entry.text)
                 .lineLimit(3)
                 .textSelection(.enabled)
+            if let raw = entry.rawText {
+                Text("Original: \(raw)")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+            }
             Text(details)
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -173,6 +187,7 @@ private struct HistoryRow: View {
         var parts = [Self.dateFormatter.string(from: entry.date)]
         if let app = entry.appName { parts.append(entry.pasted ? "pasted into \(app)" : app) }
         if !entry.pasted { parts.append("not pasted") }
+        if entry.rawText != nil { parts.append("polished") }
         if let duration = entry.duration { parts.append(String(format: "%.1f s", duration)) }
         return parts.joined(separator: " · ")
     }

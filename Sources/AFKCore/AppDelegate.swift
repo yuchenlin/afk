@@ -48,6 +48,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
     private var selfTestStartingCapture = false
     private var captureIsSelfTest = false
     private var captureStartedAt: Date?
+    /// After a permission error, polishing is skipped until this time so dictation stays fast.
+    private var polishPausedUntil: Date?
+    private var polishProblem: String?
     /// Identifies the utterance awaiting a result; stale results and the watchdog check it.
     private var pendingResultID: UUID?
     private var copyLastItem: NSMenuItem!
@@ -62,6 +65,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
     private var talkModeItem: NSMenuItem!
     private var vocabularyItem: NSMenuItem!
     private var historyItem: NSMenuItem!
+    private var outputItem: NSMenuItem!
 
     private var hotkey: Hotkey { keyMonitor.hotkey }
     private var isRecordingShortcut: Bool { recordingTimeoutWork != nil }
@@ -319,25 +323,82 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
     private func deliver(_ result: Result<String, Error>, paste: Bool, record: Bool, duration: TimeInterval?) {
         switch result {
         case let .success(text) where !text.isEmpty:
-            if record {
-                history.add(TranscriptEntry(
-                    text: text,
-                    duration: duration,
-                    appName: NSWorkspace.shared.frontmostApplication?.localizedName,
-                    pasted: paste
-                ))
-                refreshHistoryMenu()
+            guard settings.outputStyle == .polished, Polisher.shouldPolish(text) else {
+                finalize(text, raw: nil, paste: paste, record: record, duration: duration)
+                return
             }
-            if paste {
-                injector.paste(text)
-                overlay.showDone("Pasted")
-            } else {
-                overlay.showDone("Heard: \(text)")
+            if let until = polishPausedUntil, until > Date() {
+                finalize(text, raw: nil, paste: paste, record: record, duration: duration,
+                         fallbackReason: polishProblem ?? "polish unavailable")
+                return
             }
+            polish(text, paste: paste, record: record, duration: duration)
         case .success:
             overlay.showNotice("Didn't catch any speech — try again", symbol: "mic.slash.fill")
         case let .failure(error):
             overlay.showNotice("Transcription failed: \(error.localizedDescription)", symbol: "exclamationmark.triangle.fill", autoHideAfter: 5)
+        }
+    }
+
+    private func polish(_ raw: String, paste: Bool, record: Bool, duration: TimeInterval?) {
+        guard let (apiKey, _) = ApiKeyStore.load() else {
+            finalize(raw, raw: nil, paste: paste, record: record, duration: duration)
+            return
+        }
+        overlay.showPolishing()
+        let id = UUID()
+        pendingResultID = id
+        let model = UserDefaults.standard.string(forKey: "polishModel") ?? PolishConfig.defaultModel
+        let config = PolishConfig(apiKey: apiKey, model: model, vocabulary: lexicon.keyTermsForStt)
+        Polisher.polish(raw, config: config) { [weak self] result in
+            guard let self, self.pendingResultID == id else { return }
+            self.pendingResultID = nil
+            switch result {
+            case let .success(polished):
+                self.polishProblem = nil
+                self.polishPausedUntil = nil
+                self.finalize(polished, raw: polished == raw ? nil : raw, paste: paste, record: record, duration: duration)
+            case let .failure(error):
+                let reason = error.localizedDescription
+                if case PolishError.permissionDenied = error {
+                    self.polishProblem = "polish unavailable: \(reason)"
+                    self.polishPausedUntil = Date().addingTimeInterval(300)
+                    self.refreshOutputMenu()
+                }
+                self.finalize(raw, raw: nil, paste: paste, record: record, duration: duration,
+                              fallbackReason: "polish failed: \(reason)")
+            }
+        }
+    }
+
+    /// Records the transcript in history and pastes (or shows) it. `fallbackReason` explains
+    /// why the original was used although polishing was requested.
+    private func finalize(
+        _ text: String,
+        raw: String?,
+        paste: Bool,
+        record: Bool,
+        duration: TimeInterval?,
+        fallbackReason: String? = nil
+    ) {
+        if record {
+            history.add(TranscriptEntry(
+                text: text,
+                rawText: raw,
+                duration: duration,
+                appName: NSWorkspace.shared.frontmostApplication?.localizedName,
+                pasted: paste
+            ))
+            refreshHistoryMenu()
+        }
+        if paste { injector.paste(text) }
+        if let fallbackReason {
+            let what = paste ? "Pasted original" : "Heard (original): \(text)"
+            overlay.showNotice("\(what) — \(fallbackReason)", symbol: "exclamationmark.triangle.fill", autoHideAfter: 4)
+        } else if paste {
+            overlay.showDone(raw == nil ? "Pasted" : "Pasted (polished)")
+        } else {
+            overlay.showDone("Heard: \(text)")
         }
     }
 
@@ -347,11 +408,19 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
     /// pasting, so the talk flow can be checked end to end without sending key presses:
     /// `--self-test` (menu Test Transcription), `--self-test-handsfree` (tap, 3 s, tap),
     /// `--self-test-cancel` (tap, 1.5 s, Esc), `--self-test-hold` (hold 2 s, release),
-    /// `--self-test-autostop` (tap once; relies on auto-stop).
+    /// `--self-test-autostop` (tap once; relies on auto-stop), `--self-test-polish [text]`.
     private func runSelfTestIfRequested() {
         let args = CommandLine.arguments
         let after: (TimeInterval, @escaping @MainActor () -> Void) -> Void = { delay, action in
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { action() }
+        }
+        if let i = args.firstIndex(of: "--self-test-polish") {
+            let sample = args.indices.contains(i + 1) ? args[i + 1]
+                : "I feel the, the ... the product harness could be on the ... cursor codebase, you know."
+            after(1) { [weak self] in
+                self?.deliver(.success(sample), paste: false, record: false, duration: nil)
+            }
+            return
         }
         if args.contains("--open-history") {
             after(0.5) { [weak self] in self?.openHistory(nil) }
@@ -465,6 +534,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         talkModeItem = NSMenuItem(title: "Talk Mode", action: nil, keyEquivalent: "")
         menu.addItem(talkModeItem)
 
+        outputItem = NSMenuItem(title: "Output", action: nil, keyEquivalent: "")
+        menu.addItem(outputItem)
+
         vocabularyItem = NSMenuItem(title: "Vocabulary…", action: #selector(openVocabulary(_:)), keyEquivalent: "")
         vocabularyItem.target = self
         menu.addItem(vocabularyItem)
@@ -520,6 +592,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         refreshTalkModeMenu()
         refreshMicrophoneMenu()
         refreshVocabularyMenu()
+        refreshOutputMenu()
         refreshHistoryMenu()
         refreshShortcutMenu()
         refreshIdleTitle()
@@ -641,6 +714,39 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
             submenu.addItem(NSMenuItem.separator())
             submenu.addItem(missing)
         }
+    }
+
+    private func refreshOutputMenu() {
+        outputItem.title = "Output: " + (settings.outputStyle == .polished ? "Polished" : "Original")
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+        let options: [(OutputStyle, String)] = [
+            (.original, "Original — exactly what was heard"),
+            (.polished, "Polished — remove fillers, repeats and false starts"),
+        ]
+        for (style, label) in options {
+            let item = NSMenuItem(title: label, action: #selector(selectOutputStyle(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = style.rawValue
+            item.state = settings.outputStyle == style ? .on : .off
+            submenu.addItem(item)
+        }
+        if let polishProblem, settings.outputStyle == .polished {
+            submenu.addItem(.separator())
+            let info = NSMenuItem(title: "⚠️ " + polishProblem.prefix(1).uppercased() + polishProblem.dropFirst(), action: nil, keyEquivalent: "")
+            info.isEnabled = false
+            submenu.addItem(info)
+        }
+        outputItem.submenu = submenu
+    }
+
+    @objc private func selectOutputStyle(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let style = OutputStyle(rawValue: raw) else { return }
+        settings.outputStyle = style
+        settings.save()
+        // Re-check access right away if the user switches polishing back on.
+        polishPausedUntil = nil
+        refreshOutputMenu()
     }
 
     private func refreshHistoryMenu() {
