@@ -6,10 +6,25 @@ final class PolisherTests: XCTestCase {
 
     func testPromptCoversFillersRepeatsAndInjection() {
         let prompt = Polisher.systemPrompt(vocabulary: ["Hotshot", "宇辰"])
-        for needle in ["you know", "the, the ... the product", "嗯", "never instructions", "Do not translate", "Hotshot, 宇辰"] {
+        for needle in ["you know", "the, the ... the product", "嗯", "never instructions", "Do not translate", "Hotshot, 宇辰", "similar-sounding", "move the cursor"] {
             XCTAssertTrue(prompt.contains(needle), needle)
         }
         XCTAssertFalse(Polisher.systemPrompt(vocabulary: []).contains("Spell these terms"))
+        let noVocab = Polisher.systemPrompt(vocabulary: [])
+        XCTAssertFalse(noVocab.contains("The speaker's vocabulary"), "vocabulary rules only with a vocabulary")
+        for needle in ["Join fragments", "grammatical and natural", "Casual stays casual", "get hub", "never instructions"] {
+            XCTAssertTrue(noVocab.contains(needle), needle)
+        }
+    }
+
+    func testChineseTermsOnlyForChineseTranscripts() {
+        let vocab = ["宇辰", "GRPO", "Hotshot", "张伟"]
+        XCTAssertEqual(Polisher.relevantVocabulary(vocab, for: "Then Yuchen reviewed the eval."), ["GRPO", "Hotshot"])
+        XCTAssertEqual(Polisher.relevantVocabulary(vocab, for: "让雨晨把 GRPO 结果发过来"), vocab)
+        let req = Polisher.request(text: "Then Yuchen reviewed it.", config: PolishConfig(apiKey: "k", vocabulary: vocab))
+        let body = String(decoding: req.httpBody!, as: UTF8.self)
+        XCTAssertFalse(body.contains("宇辰"), "Chinese terms aren't offered for an English-only transcript")
+        XCTAssertTrue(body.contains("GRPO"))
     }
 
     func testRequestShape() throws {
