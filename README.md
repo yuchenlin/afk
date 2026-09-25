@@ -23,7 +23,7 @@ Needs **full Xcode.app** (CLT alone fails on Swift 6.4 with a cryptic plist pars
 
 ## Use
 
-1. Menu bar shows **AFK**
+1. Menu bar shows the AFK face (filled while recording; ⚠︎ next to it when a permission or the API key is missing)
 2. Hold **⌘G** and speak — a pill at the bottom of the screen shows the mic level and live transcript
 3. Release — the final transcript pastes at the cursor (falls back to the batch API if streaming fails)
 4. A quick tap (<150ms) passes ⌘G through to the app, so Find Next still works
@@ -46,6 +46,10 @@ Sources/AFKApp/    main.swift
 docs/PLAN.md       product plan
 docs/PRIOR_ART.md  reuse notes
 ```
+
+## Icon
+
+The logo is `design/logo/afk-logo-dark.svg` (and `-light`): two eyes above a sound-wave smile. `Sources/AFKCore/LogoMark.swift` holds the same geometry and draws the menu bar icon; `make icons` renders `Resources/AppIcon.icns` (bundled into the app) plus `design/icons/` — the macOS iconset and `ios-AppIcon-1024.png` (square, opaque, for the App Store). Earlier logo explorations are in `design/logo/candidates/`.
 
 ## Roadmap
 

@@ -272,7 +272,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         captureIsSelfTest = selfTestStartingCapture
         captureStartedAt = start
         pauseDetector = PauseDetector(startedAt: start)
-        statusItem.button?.title = "●"
+        setStatusIcon(active: true, text: nil)
         statusItem.button?.toolTip = "AFK recording…"
         overlay.showListening()
         return nil
@@ -527,7 +527,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         stopCapture(finish: false)
         pressStartedAt = nil
         keyMonitor.startRecording()
-        statusItem.button?.title = "Press shortcut…"
+        setStatusIcon(active: false, text: "Press shortcut…")
         statusItem.button?.toolTip = "Press the new AFK shortcut, or Esc to cancel"
         overlay.showNotice("Press the new shortcut (Esc to cancel)", symbol: "keyboard", autoHideAfter: nil)
 
@@ -659,6 +659,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         refreshIdleTitle()
     }
 
+    /// Menu bar shows the AFK face; `active` (filled) while recording, plus optional text.
+    private func setStatusIcon(active: Bool, text: String?) {
+        guard let button = statusItem.button else { return }
+        button.image = LogoMark.menuBarImage(active: active)
+        button.imagePosition = text == nil ? .imageOnly : .imageLeft
+        button.title = text.map { " " + $0 } ?? ""
+    }
+
     private var talkHint: String {
         switch settings.mode {
         case .hold: return "hold \(hotkey.displayName) to talk"
@@ -669,10 +677,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
     private func refreshIdleTitle() {
         guard !isRecordingShortcut else { return }
         if hasPermission {
-            statusItem.button?.title = "AFK"
+            setStatusIcon(active: false, text: nil)
             statusItem.button?.toolTip = "AFK — \(talkHint)"
         } else {
-            statusItem.button?.title = "AFK ⚠︎"
+            setStatusIcon(active: false, text: "⚠︎")
             statusItem.button?.toolTip = "AFK needs Accessibility permission"
         }
     }

@@ -6,7 +6,7 @@ DEV_CERT := AFK Local Dev
 # survives rebuilds; fall back to ad-hoc signing.
 CODESIGN_IDENTITY ?= $(shell security find-certificate -c "$(DEV_CERT)" >/dev/null 2>&1 && echo "$(DEV_CERT)" || echo -)
 
-.PHONY: build clean run install dev-cert api-key
+.PHONY: build clean run install dev-cert api-key icons
 
 build:
 	swift build -c release
@@ -17,6 +17,7 @@ build:
 	cp $(BUILD_DIR)/$(APP_NAME) $(APP_BUNDLE)/Contents/MacOS/
 	cp Supporting/Info.plist $(APP_BUNDLE)/Contents/
 	cp Resources/lexicon.example.txt $(APP_BUNDLE)/Contents/Resources/lexicon.txt
+	cp Resources/AppIcon.icns $(APP_BUNDLE)/Contents/Resources/AppIcon.icns
 	codesign --force --sign "$(CODESIGN_IDENTITY)" $(APP_BUNDLE)
 	@echo "✅ Built $(APP_BUNDLE)"
 
@@ -43,3 +44,11 @@ api-key:
 	mkdir -p "$(KEY_DIR)" && chmod 700 "$(KEY_DIR)" && \
 	(umask 077; printf '%s' "$$KEY" > "$(KEY_DIR)/xai-api-key") && \
 	echo "✅ Wrote $(KEY_DIR)/xai-api-key"
+
+# Regenerates the app icons from Sources/AFKCore/LogoMark.swift (see design/logo/).
+icons:
+	mkdir -p .build design/icons
+	swiftc -O -parse-as-library Sources/AFKCore/LogoMark.swift scripts/make-icons.swift -o .build/make-icons
+	.build/make-icons design/icons
+	iconutil -c icns design/icons/AppIcon.iconset -o Resources/AppIcon.icns
+	@echo "✅ Resources/AppIcon.icns and design/icons/"
