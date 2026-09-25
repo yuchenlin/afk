@@ -1,38 +1,46 @@
 # AFK
 
-**Away From Keyboard** — speak to insert on macOS (iOS later).
+**Away From Keyboard** — hold **Fn**, speak, text lands at the caret (macOS first).
 
-Hold a hotkey, talk (Chinese / English / mixed), get clean text at the caret. Differentiator is not the mic: **STT + personal lexicon + light LLM polish**.
+v0.1 is a **runnable shell**: Fn → mock transcript → paste. Grok STT comes next.
 
-## Status
+## Prior art
 
-- [x] Private repo + product plan
-- [x] Shared core + macOS menu-bar scaffold
-- [ ] Wire Grok Voice Transcribe 2.0 streaming
-- [ ] 50-phrase zh–en mix eval (Grok vs Fun-ASR)
-- [ ] Polish pass + lexicon import
-- [ ] iOS keyboard ↔ host app relay
+See [docs/PRIOR_ART.md](docs/PRIOR_ART.md). Fn + paste adapted from [Scribe](https://github.com/xiangst0816/scribe) (MIT).
+
+## Build (Mac)
+
+```bash
+git clone https://github.com/yuchenlin/afk.git
+cd afk
+make build          # → AFK.app
+open AFK.app
+# or: make install  # → /Applications/AFK.app
+```
+
+Needs Xcode (or full CLT with macOS SDK). Grant **Accessibility** (Fn + paste). Mic comes when real STT lands.
+
+## Use
+
+1. Menu bar shows **AFK**
+2. Hold **Fn**, release (≥150ms)
+3. A mock line pastes at the cursor — proves the path
+4. Menu → **Paste test string** without Fn
+5. Menu → **Enabled** toggles the listener
 
 ## Layout
 
 ```
-Apps/macOS/AFK/     Menu bar app (hotkey, permissions, insert)
-Sources/AFKCore/    Audio → STT → lexicon → polish → insert
-docs/PLAN.md        Product + architecture plan
-eval/               Mix-language test set template
-Resources/          Example lexicon
+Sources/AFKCore/   KeyMonitor, TextInjector, MockStt, AppDelegate
+Sources/AFKApp/    main.swift
+docs/PLAN.md       product plan
+docs/PRIOR_ART.md  reuse notes
 ```
 
-## Quick start (on a Mac with Xcode)
+## Roadmap
 
-1. Clone this repo.
-2. Copy `.env.example` → keep the key out of the app; prefer a tiny proxy later.
-3. Open `AFK.xcodeproj` (or generate with `./Scripts/generate-xcode.sh` if present).
-4. Grant **Microphone** + **Accessibility**.
-5. Hold **Right Option** (default) to record; release to finalize.
-
-See [docs/PLAN.md](docs/PLAN.md) for architecture, engines, MVP scope, and ship order.
-
-## License
-
-Private — all rights reserved.
+1. ~~Mac shell + Fn + paste~~
+2. Real mic + Grok Voice Transcribe 2.0 streaming
+3. Lexicon + light polish
+4. zh–en mix eval vs Fun-ASR
+5. iOS keyboard relay

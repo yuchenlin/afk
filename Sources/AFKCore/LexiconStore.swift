@@ -8,19 +8,10 @@ public struct LexiconStore: Sendable, Equatable {
     }
 
     public init(from text: String) {
-        let lines = text.split(whereSeparator: \.isNewline).map(String.init)
-        self.init(terms: lines)
+        self.init(terms: text.split(whereSeparator: \.isNewline).map(String.init))
     }
 
-    public static func load(from url: URL) throws -> LexiconStore {
-        let text = try String(contentsOf: url, encoding: .utf8)
-        return LexiconStore(from: text)
-    }
-
-    /// Grok accepts at most 100 key terms.
-    public var keyTermsForStt: [String] {
-        Array(terms.prefix(100))
-    }
+    public var keyTermsForStt: [String] { Array(terms.prefix(100)) }
 
     private static func normalize(_ terms: [String]) -> [String] {
         var seen = Set<String>()

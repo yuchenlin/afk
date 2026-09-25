@@ -71,8 +71,10 @@ Shared: audio pipeline + STT clients + lexicon + polish. **Not** one UI.
 
 ### macOS (MVP)
 
+Default hotkey is **Fn** (same muscle memory as Typeless / Scribe), not Right Option.
+
 1. Menu bar app (`LSUIElement`)
-2. Hold Right Option / Fn → record; release → finalize
+2. Hold **Fn** (Typeless-compatible) → record; release → finalize
 3. Thin streaming strip on screen edge
 4. Insert via Accessibility; fallback Cmd+V
 5. Permissions: Microphone + Accessibility

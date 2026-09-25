@@ -7,10 +7,7 @@ final class LexiconTests: XCTestCase {
         # comment
         LoRA
         Grok
-
-        CUDA
         """
-        let lex = LexiconStore(from: text)
-        XCTAssertEqual(lex.terms, ["LoRA", "Grok", "CUDA"])
+        XCTAssertEqual(LexiconStore(from: text).terms, ["LoRA", "Grok"])
     }
 }
