@@ -12,7 +12,7 @@ build:
 	mkdir -p $(APP_BUNDLE)/Contents/MacOS
 	mkdir -p $(APP_BUNDLE)/Contents/Resources
 	cp $(BUILD_DIR)/$(APP_NAME) $(APP_BUNDLE)/Contents/MacOS/
-	cp Info.plist $(APP_BUNDLE)/Contents/
+	cp Supporting/Info.plist $(APP_BUNDLE)/Contents/
 	codesign --force --sign "$(CODESIGN_IDENTITY)" $(APP_BUNDLE)
 	@echo "✅ Built $(APP_BUNDLE)"
 
