@@ -18,7 +18,7 @@ open AFK.app
 # or: make install  # → /Applications/AFK.app
 ```
 
-Needs Xcode (or full CLT with macOS SDK). Grant **Accessibility** (Fn + paste). Mic comes when real STT lands.
+Needs **full Xcode.app** (CLT alone fails on Swift 6.4 with a cryptic plist parse error). PiggyHouse is the intended build machine. Grant **Accessibility** (Fn + paste). Mic comes when real STT lands.
 
 ## Use
 
