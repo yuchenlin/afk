@@ -34,7 +34,7 @@ make dev-cert   # creates a self-signed "AFK Local Dev" identity in the login ke
 make api-key   # writes $XAI_API_KEY_VOICE to ~/Library/Application Support/AFK/xai-api-key (mode 600)
 ```
 
-AFK only uses `XAI_API_KEY_VOICE`: from its environment when launched from a shell, otherwise from the key file (apps opened from Finder don't see `~/.zshrc`). A generic `XAI_API_KEY` is ignored. The Keychain isn't used because self-signed rebuilds re-trigger its access prompt, which blocks the app. Key terms come from the menu's **Vocabulary…** editor, saved to `~/Library/Application Support/AFK/lexicon.txt`; until that file exists the bundled `Resources/lexicon.example.txt` is used. `--open-vocabulary` / `--open-history` open those windows at launch.
+AFK only uses `XAI_API_KEY_VOICE`: from its environment when launched from a shell, otherwise from the key file (apps opened from Finder don't see `~/.zshrc`). A generic `XAI_API_KEY` is ignored. The Keychain isn't used because self-signed rebuilds re-trigger its access prompt, which blocks the app. Key terms come from the menu's **Vocabulary…** editor, saved to `~/Library/Application Support/AFK/lexicon.txt`; until that file exists the bundled `Resources/lexicon.example.txt` is used. `--open-vocabulary` / `--open-history` / `--open-settings` open those windows at launch.
 
 ## Diagnostics
 

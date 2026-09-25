@@ -15,7 +15,7 @@ git clone https://github.com/yuchenlin/afk.git
 cd afk
 make dev-cert       # once: stable signing so Accessibility survives rebuilds
 make install        # → /Applications/AFK.app
-make api-key        # once: writes $XAI_API_KEY_VOICE to a user-only key file
+make api-key        # optional: writes $XAI_API_KEY_VOICE to the key file (or paste it in Settings…)
 open /Applications/AFK.app
 ```
 
@@ -33,8 +33,9 @@ Needs **full Xcode.app** (CLT alone fails on Swift 6.4 with a cryptic plist pars
 8. Menu → **Vocabulary…**: your own words and phrases, one per line (names, product terms, jargon such as GRPO, Hotshot, 宇辰). They're sent to Grok as key terms (max 100, each ≤ 50 characters) so they're recognized and spelled as written; saving applies from the next recording. Stored in `~/Library/Application Support/AFK/lexicon.txt`
 9. Menu → **Microphone**: System Default or a specific input; the choice persists and falls back to the default if that device is unplugged
 10. Menu → **History… (N)**: every transcript with time, target app, and length, newest first. Search, **Copy** (several at once), **Paste into Previous App**, **Delete** (or ⌫), and **Clear All…** (confirmed). Saved locally in `~/Library/Application Support/AFK/history.json` (mode 600); diagnostic self-tests aren't recorded
-11. Menu → **Copy Last Transcript** if a paste went to the wrong place; **Paste test string** checks pasting without the mic
-12. Menu → **Enabled** toggles the listener
+11. Menu → **Settings…** (⌘,): paste your xAI API key (masked; saved to the user-only key file), **Test Key** checks speech-to-text and polish access separately and names the problem (incorrect key, no access, unknown model), and **Models (Advanced)** overrides the speech and polish model names. The menu shows ⚠️ when the key is missing or rejected
+12. Menu → **Copy Last Transcript** if a paste went to the wrong place; **Paste test string** checks pasting without the mic
+13. Menu → **Enabled** toggles the listener
 
 ## Layout
 

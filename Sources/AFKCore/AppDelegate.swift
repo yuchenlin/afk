@@ -13,6 +13,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
     private var lexicon = VocabularyStore.load()
     private let vocabularyWindow = VocabularyWindowController()
     private let history = HistoryStore()
+    private let settingsWindow = SettingsWindowController()
     private lazy var historyWindow = HistoryWindowController(store: history) { [weak self] text in
         self?.injector.paste(text)
     }
@@ -51,6 +52,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
     /// After a permission error, polishing is skipped until this time so dictation stays fast.
     private var polishPausedUntil: Date?
     private var polishProblem: String?
+    /// Missing or rejected API key / unknown model; shown at the top of the menu.
+    private var apiProblem: String?
     /// Identifies the utterance awaiting a result; stale results and the watchdog check it.
     private var pendingResultID: UUID?
     private var copyLastItem: NSMenuItem!
@@ -66,6 +69,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
     private var vocabularyItem: NSMenuItem!
     private var historyItem: NSMenuItem!
     private var outputItem: NSMenuItem!
+    private var apiItem: NSMenuItem!
 
     private var hotkey: Hotkey { keyMonitor.hotkey }
     private var isRecordingShortcut: Bool { recordingTimeoutWork != nil }
@@ -76,6 +80,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
+        if ApiKeyStore.load() == nil { setApiProblem("No xAI API key — open Settings…") }
         promptAccessibilityIfNeeded()
 
         keyMonitor.onHotkeyDown = { [weak self] in self?.hotkeyDown() }
@@ -84,6 +89,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         keyMonitor.onRecordingRejected = { NSSound.beep() }
         keyMonitor.onEscape = { [weak self] in self?.cancelHandsFree() }
         vocabularyWindow.onSave = { [weak self] lexicon in self?.vocabularySaved(lexicon) }
+        settingsWindow.onSave = { [weak self] in self?.settingsSaved() }
         installEditMenu()
 
         if !startListening() {
@@ -226,7 +232,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
     /// Starts mic capture and a streaming session; returns a user-facing reason if it can't.
     private func startCapture(_ kind: Capture, at start: Date) -> String? {
         guard let (apiKey, keySource) = ApiKeyStore.load() else {
-            return "No xAI API key — run `make api-key` in the afk repo"
+            setApiProblem("No xAI API key — open Settings…")
+            return "No xAI API key — open AFK → Settings… to add one"
         }
         sttLog.info("using API key from \(keySource.rawValue, privacy: .public)")
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
@@ -239,7 +246,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
             return "Microphone is off for AFK — System Settings → Privacy & Security → Microphone"
         }
 
-        let session = GrokSttSession(config: GrokSttConfig(apiKey: apiKey, keyterms: lexicon.keyTermsForStt))
+        var sttConfig = GrokSttConfig(apiKey: apiKey, keyterms: lexicon.keyTermsForStt)
+        sttConfig.model = ModelSettings.speechModel()
+        let session = GrokSttSession(config: sttConfig)
         session.onPartial = { [weak self] text in
             guard let self else { return }
             self.overlay.updateTranscript(text)
@@ -321,6 +330,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
     }
 
     private func deliver(_ result: Result<String, Error>, paste: Bool, record: Bool, duration: TimeInterval?) {
+        if case .success = result { setApiProblem(nil) }
         switch result {
         case let .success(text) where !text.isEmpty:
             guard settings.outputStyle == .polished, Polisher.shouldPolish(text) else {
@@ -336,8 +346,47 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         case .success:
             overlay.showNotice("Didn't catch any speech — try again", symbol: "mic.slash.fill")
         case let .failure(error):
-            overlay.showNotice("Transcription failed: \(error.localizedDescription)", symbol: "exclamationmark.triangle.fill", autoHideAfter: 5)
+            if let problem = Self.apiProblem(for: error) {
+                setApiProblem(problem + " — open Settings…")
+                overlay.showNotice("\(problem) — open AFK → Settings… to test your key", symbol: "key.fill", autoHideAfter: 6)
+            } else {
+                overlay.showNotice("Transcription failed: \(error.localizedDescription)", symbol: "exclamationmark.triangle.fill", autoHideAfter: 5)
+            }
         }
+    }
+
+    /// Recognizes key and model errors from speech-to-text, which need the user to act in Settings.
+    static func apiProblem(for error: Error) -> String? {
+        guard case let GrokSttError.http(status, body) = error else { return nil }
+        switch KeyCheck.from(status: status, body: Data(body.utf8), model: ModelSettings.speechModel(), seconds: 0) {
+        case .invalidKey: return "API key rejected"
+        case .noAccess: return "API key has no speech-to-text access"
+        case .modelNotFound: return "Speech model not found"
+        default: return nil
+        }
+    }
+
+    private func setApiProblem(_ problem: String?) {
+        guard apiProblem != problem else { return }
+        apiProblem = problem
+        refreshApiMenu()
+    }
+
+    private func refreshApiMenu() {
+        apiItem.title = "⚠️ " + (apiProblem ?? "")
+        apiItem.isHidden = apiProblem == nil
+    }
+
+    @objc private func openSettings(_ sender: NSMenuItem?) {
+        settingsWindow.show()
+    }
+
+    private func settingsSaved() {
+        setApiProblem(nil)
+        polishProblem = nil
+        polishPausedUntil = nil
+        refreshOutputMenu()
+        overlay.showDone("Settings saved — used from the next recording")
     }
 
     private func polish(_ raw: String, paste: Bool, record: Bool, duration: TimeInterval?) {
@@ -348,8 +397,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         overlay.showPolishing()
         let id = UUID()
         pendingResultID = id
-        let model = UserDefaults.standard.string(forKey: "polishModel") ?? PolishConfig.defaultModel
-        let config = PolishConfig(apiKey: apiKey, model: model, vocabulary: lexicon.keyTermsForStt)
+        let config = PolishConfig(apiKey: apiKey, model: ModelSettings.polishModel(), vocabulary: lexicon.keyTermsForStt)
         Polisher.polish(raw, config: config) { [weak self] result in
             guard let self, self.pendingResultID == id else { return }
             self.pendingResultID = nil
@@ -361,7 +409,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
             case let .failure(error):
                 let reason = error.localizedDescription
                 if case PolishError.permissionDenied = error {
-                    self.polishProblem = "polish unavailable: \(reason)"
+                    self.polishProblem = "polish unavailable: \(reason) (see Settings → Test Key)"
                     self.polishPausedUntil = Date().addingTimeInterval(300)
                     self.refreshOutputMenu()
                 }
@@ -420,6 +468,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
             after(1) { [weak self] in
                 self?.deliver(.success(sample), paste: false, record: false, duration: nil)
             }
+            return
+        }
+        if args.contains("--open-settings") {
+            after(0.5) { [weak self] in self?.openSettings(nil) }
             return
         }
         if args.contains("--open-history") {
@@ -514,6 +566,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         permissionItem.target = self
         menu.addItem(permissionItem)
 
+        apiItem = NSMenuItem(title: "", action: #selector(openSettings(_:)), keyEquivalent: "")
+        apiItem.target = self
+        apiItem.isHidden = true
+        menu.addItem(apiItem)
+
         hintItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         hintItem.isEnabled = false
         menu.addItem(hintItem)
@@ -579,6 +636,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         menu.addItem(test)
 
         menu.addItem(NSMenuItem.separator())
+
+        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings(_:)), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
 
         let quit = NSMenuItem(
             title: "Quit AFK",
