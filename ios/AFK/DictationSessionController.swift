@@ -162,9 +162,25 @@ final class DictationSessionController: ObservableObject {
         do {
             try keepalive.start()
             keepaliveRunning = true
+            // Clear prior failure so UI never shows green "on" + red failed together.
+            if errorMessage?.hasPrefix("Background audio keepalive failed:") == true {
+                errorMessage = nil
+            }
+            if status.hasPrefix("Keepalive failed") {
+                let minutes = max(1, settings.sessionMinutes)
+                status = "Session active · \(minutes) min"
+                relay.statusMessage = status
+            }
         } catch {
             keepaliveRunning = false
-            errorMessage = "Background audio keepalive failed: \(error.localizedDescription)"
+            let ns = error as NSError
+            let detail: String
+            if ns.domain == NSOSStatusErrorDomain, ns.code == 560557684 {
+                detail = "CannotInterruptOthers (!int) — session was non-mixable in background"
+            } else {
+                detail = error.localizedDescription
+            }
+            errorMessage = "Background audio keepalive failed: \(detail)"
             status = "Keepalive failed — stay in AFK"
             relay.statusMessage = status
         }
@@ -203,13 +219,17 @@ final class DictationSessionController: ObservableObject {
         }
         if !isSessionActive { beginSession() }
 
-        // Pause silent loop so AVAudioEngine can own the input; resume after stop.
-        keepalive.stop()
+        // Pause keepalive playback so AVAudioEngine can own the input.
+        // Leave the mixable AVAudioSession active — do not deactivate.
+        // Recording itself asserts UIBackgroundModes:audio once the engine starts.
+        keepalive.pauseForCapture()
         keepaliveRunning = false
 
         do {
             try capture.start()
         } catch {
+            // Capture failed (often while backgrounded) — restore keepalive immediately
+            // so the host is not left without a background assertion.
             startKeepaliveIfNeeded()
             throw error
         }

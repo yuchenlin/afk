@@ -35,12 +35,23 @@ final class KeyboardView: UIView {
     private let previewLabel = UILabel()
     private let contentHost = UIView()
 
-    // Voice chrome
+    // Voice chrome (Typeless-like: brand | modes · Tap to speak · pill mic · bottom chrome)
     private let voiceStack = UIStackView()
+    private let headerBar = UIStackView()
+    private let brandLabel = UILabel()
+    private let modeBar = UIStackView()
+    private var modeVoiceBtn: UIButton!
+    private var modeENBtn: UIButton!
+    private var modeCNBtn: UIButton!
     private let micButton = UIButton(type: .custom)
     private let waveform = WaveformView()
     private let holdHint = UILabel()
-    private let voiceToolbar = UIStackView()
+    private let voiceBottom = UIView()
+    private let voiceReturn = UIButton(type: .system)
+    private let voiceAIBtn = UIButton(type: .system)
+    private let voiceGlobe = UIButton(type: .system)
+    private let voiceBackspace = UIButton(type: .system)
+    private let voiceAt = UIButton(type: .system)
 
     // Typing chrome
     private let typingStack = UIStackView()
@@ -59,7 +70,7 @@ final class KeyboardView: UIView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = UIColor.systemGray6
+        backgroundColor = UIColor(red: 0.11, green: 0.11, blue: 0.12, alpha: 1)
         buildChrome()
         applyMode(.voice, animated: false)
     }
@@ -92,28 +103,27 @@ final class KeyboardView: UIView {
             statusLabel.text = "Full Access off · typing OK · dictation needs AFK app + Full Access"
             statusLabel.textColor = .systemOrange
             styleMic(ready: false, recording: false)
-            holdHint.text = "Enable Full Access for dictation"
+            holdHint.text = "Enable Full Access"
         } else if recording {
             statusLabel.text = hostStatus.isEmpty ? "Listening… release to send" : hostStatus
             statusLabel.textColor = .systemRed
             styleMic(ready: true, recording: true)
-            holdHint.text = "Release to send"
         } else if sessionOn, !hostAlive {
             statusLabel.text = "Session flagged on · host suspended — tap mic to wake AFK"
             statusLabel.textColor = .systemOrange
             styleMic(ready: true, recording: false)
-            holdHint.text = "Host not alive · tap opens AFK"
+            holdHint.text = "Tap to wake AFK"
         } else if sessionOn {
             let base = hostStatus.isEmpty ? "Session on · hold mic to talk" : hostStatus
             statusLabel.text = hostAlive ? base : base
-            statusLabel.textColor = .secondaryLabel
+            statusLabel.textColor = UIColor(white: 0.65, alpha: 1)
             styleMic(ready: true, recording: false)
-            holdHint.text = "Hold to talk · tap to toggle"
+            holdHint.text = "Tap to speak"
         } else {
             statusLabel.text = "No session · open AFK → Start dictation session"
             statusLabel.textColor = .systemOrange
             styleMic(ready: false, recording: false)
-            holdHint.text = "Start a session in the AFK app first"
+            holdHint.text = "Start session in AFK"
         }
     }
 
@@ -161,7 +171,7 @@ final class KeyboardView: UIView {
         previewLabel.font = .systemFont(ofSize: 15, weight: .medium)
         previewLabel.textAlignment = .center
         previewLabel.numberOfLines = 2
-        previewLabel.textColor = .label
+        previewLabel.textColor = .white
         previewLabel.isHidden = true
 
         contentHost.translatesAutoresizingMaskIntoConstraints = false
@@ -178,21 +188,51 @@ final class KeyboardView: UIView {
 
     private func buildVoiceSurface() {
         voiceStack.axis = .vertical
-        voiceStack.alignment = .center
-        voiceStack.spacing = 10
+        voiceStack.alignment = .fill
+        voiceStack.spacing = 14
         voiceStack.translatesAutoresizingMaskIntoConstraints = false
 
+        // Top: AFK brand · waveform | EN | 拼
+        headerBar.axis = .horizontal
+        headerBar.alignment = .center
+        headerBar.distribution = .equalSpacing
+        headerBar.translatesAutoresizingMaskIntoConstraints = false
+
+        brandLabel.text = "AFK"
+        brandLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+        brandLabel.textColor = .white
+
+        modeBar.axis = .horizontal
+        modeBar.spacing = 4
+        modeBar.alignment = .center
+        modeVoiceBtn = makeModeChip(systemName: "waveform", selected: true)
+        modeENBtn = makeModeChip(title: "EN", selected: false)
+        modeCNBtn = makeModeChip(title: "拼", selected: false)
+        modeVoiceBtn.addAction(UIAction { [weak self] _ in self?.delegate?.keyboardSwitchToVoice() }, for: .touchUpInside)
+        modeENBtn.addAction(UIAction { [weak self] _ in self?.delegate?.keyboardSwitchToTypingEN() }, for: .touchUpInside)
+        modeCNBtn.addAction(UIAction { [weak self] _ in self?.delegate?.keyboardSwitchToTypingCN() }, for: .touchUpInside)
+        modeBar.addArrangedSubview(modeVoiceBtn)
+        modeBar.addArrangedSubview(modeENBtn)
+        modeBar.addArrangedSubview(modeCNBtn)
+        headerBar.addArrangedSubview(brandLabel)
+        headerBar.addArrangedSubview(modeBar)
+
+        holdHint.font = .systemFont(ofSize: 15, weight: .medium)
+        holdHint.textColor = UIColor(white: 0.7, alpha: 1)
+        holdHint.textAlignment = .center
+        holdHint.text = "Tap to speak"
+
+        // Large white pill mic (Typeless)
         micButton.translatesAutoresizingMaskIntoConstraints = false
-        micButton.layer.cornerRadius = 48
+        micButton.layer.cornerRadius = 28
         micButton.clipsToBounds = true
-        let micConfig = UIImage.SymbolConfiguration(pointSize: 36, weight: .semibold)
+        let micConfig = UIImage.SymbolConfiguration(pointSize: 28, weight: .semibold)
         micButton.setImage(UIImage(systemName: "mic.fill", withConfiguration: micConfig), for: .normal)
-        micButton.tintColor = .white
-        micButton.backgroundColor = .systemOrange
-        micButton.accessibilityLabel = "Hold to talk"
+        micButton.tintColor = .black
+        micButton.backgroundColor = .white
+        micButton.accessibilityLabel = "Tap to speak"
         micButton.addTarget(self, action: #selector(micTouchDown), for: .touchDown)
         micButton.addTarget(self, action: #selector(micTouchUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
-        // Long-press is the primary path; short tap still toggles via touchUp if hold didn't start record long enough — handled in controller via tap.
         let tap = UITapGestureRecognizer(target: self, action: #selector(micTapRecognized))
         tap.cancelsTouchesInView = false
         micButton.addGestureRecognizer(tap)
@@ -200,32 +240,109 @@ final class KeyboardView: UIView {
         waveform.translatesAutoresizingMaskIntoConstraints = false
         waveform.isHidden = true
 
-        holdHint.font = .systemFont(ofSize: 12, weight: .medium)
-        holdHint.textColor = .secondaryLabel
-        holdHint.textAlignment = .center
-        holdHint.text = "Hold to talk · tap to toggle"
+        // Bottom chrome: AI · return · backspace / globe · @
+        voiceBottom.translatesAutoresizingMaskIntoConstraints = false
+        styleRoundChrome(voiceAIBtn, systemName: "pencil.and.outline")
+        styleRoundChrome(voiceGlobe, systemName: "globe")
+        styleRoundChrome(voiceBackspace, systemName: "delete.left.fill")
+        styleRoundChrome(voiceAt, title: "@")
+        voiceReturn.setTitle("return", for: .normal)
+        voiceReturn.setTitleColor(.white, for: .normal)
+        voiceReturn.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
+        voiceReturn.backgroundColor = UIColor(white: 0.22, alpha: 1)
+        voiceReturn.layer.cornerRadius = 22
+        voiceReturn.translatesAutoresizingMaskIntoConstraints = false
+        voiceAIBtn.addAction(UIAction { [weak self] _ in self?.flash("AI polish runs in the AFK host") }, for: .touchUpInside)
+        voiceGlobe.addAction(UIAction { [weak self] _ in self?.delegate?.keyboardNextKeyboard() }, for: .touchUpInside)
+        voiceBackspace.addAction(UIAction { [weak self] _ in self?.delegate?.keyboardDelete() }, for: .touchUpInside)
+        voiceAt.addAction(UIAction { [weak self] _ in self?.delegate?.keyboardInsert("@") }, for: .touchUpInside)
+        voiceReturn.addAction(UIAction { [weak self] _ in self?.delegate?.keyboardReturn() }, for: .touchUpInside)
 
-        voiceToolbar.axis = .horizontal
-        voiceToolbar.spacing = 6
-        voiceToolbar.distribution = .fillEqually
-        voiceToolbar.translatesAutoresizingMaskIntoConstraints = false
-        for title in ["🌐", "ABC", "中文", "⌫", "return"] {
-            voiceToolbar.addArrangedSubview(makeChromeKey(title))
-        }
+        [voiceAIBtn, voiceGlobe, voiceBackspace, voiceAt, voiceReturn].forEach { voiceBottom.addSubview($0) }
+        NSLayoutConstraint.activate([
+            voiceAIBtn.leadingAnchor.constraint(equalTo: voiceBottom.leadingAnchor, constant: 8),
+            voiceAIBtn.topAnchor.constraint(equalTo: voiceBottom.topAnchor),
+            voiceAIBtn.widthAnchor.constraint(equalToConstant: 44),
+            voiceAIBtn.heightAnchor.constraint(equalToConstant: 44),
+            voiceGlobe.leadingAnchor.constraint(equalTo: voiceBottom.leadingAnchor, constant: 8),
+            voiceGlobe.bottomAnchor.constraint(equalTo: voiceBottom.bottomAnchor),
+            voiceGlobe.widthAnchor.constraint(equalToConstant: 44),
+            voiceGlobe.heightAnchor.constraint(equalToConstant: 44),
+            voiceBackspace.trailingAnchor.constraint(equalTo: voiceBottom.trailingAnchor, constant: -8),
+            voiceBackspace.topAnchor.constraint(equalTo: voiceBottom.topAnchor),
+            voiceBackspace.widthAnchor.constraint(equalToConstant: 44),
+            voiceBackspace.heightAnchor.constraint(equalToConstant: 44),
+            voiceAt.trailingAnchor.constraint(equalTo: voiceBottom.trailingAnchor, constant: -8),
+            voiceAt.bottomAnchor.constraint(equalTo: voiceBottom.bottomAnchor),
+            voiceAt.widthAnchor.constraint(equalToConstant: 44),
+            voiceAt.heightAnchor.constraint(equalToConstant: 44),
+            voiceReturn.centerXAnchor.constraint(equalTo: voiceBottom.centerXAnchor),
+            voiceReturn.centerYAnchor.constraint(equalTo: voiceBottom.centerYAnchor),
+            voiceReturn.widthAnchor.constraint(equalToConstant: 160),
+            voiceReturn.heightAnchor.constraint(equalToConstant: 44),
+            voiceBottom.heightAnchor.constraint(equalToConstant: 100),
+        ])
 
-        voiceStack.addArrangedSubview(micButton)
-        voiceStack.addArrangedSubview(waveform)
-        voiceStack.addArrangedSubview(holdHint)
-        voiceStack.addArrangedSubview(voiceToolbar)
+        let micWrap = UIStackView(arrangedSubviews: [holdHint, micButton, waveform])
+        micWrap.axis = .vertical
+        micWrap.alignment = .center
+        micWrap.spacing = 12
+
+        voiceStack.addArrangedSubview(headerBar)
+        voiceStack.addArrangedSubview(micWrap)
+        voiceStack.addArrangedSubview(voiceBottom)
 
         NSLayoutConstraint.activate([
-            micButton.widthAnchor.constraint(equalToConstant: 96),
-            micButton.heightAnchor.constraint(equalToConstant: 96),
-            waveform.widthAnchor.constraint(equalTo: voiceStack.widthAnchor, multiplier: 0.7),
+            micButton.widthAnchor.constraint(equalTo: voiceStack.widthAnchor, multiplier: 0.72),
+            micButton.heightAnchor.constraint(equalToConstant: 56),
+            waveform.widthAnchor.constraint(equalTo: voiceStack.widthAnchor, multiplier: 0.55),
             waveform.heightAnchor.constraint(equalToConstant: 28),
-            voiceToolbar.heightAnchor.constraint(equalToConstant: 44),
-            voiceToolbar.widthAnchor.constraint(equalTo: voiceStack.widthAnchor),
         ])
+    }
+
+    private func makeModeChip(title: String? = nil, systemName: String? = nil, selected: Bool) -> UIButton {
+        let btn = UIButton(type: .system)
+        if let systemName {
+            let cfg = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+            btn.setImage(UIImage(systemName: systemName, withConfiguration: cfg), for: .normal)
+        } else {
+            btn.setTitle(title, for: .normal)
+            btn.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+        }
+        btn.tintColor = selected ? .white : UIColor(white: 0.65, alpha: 1)
+        btn.setTitleColor(selected ? .white : UIColor(white: 0.65, alpha: 1), for: .normal)
+        btn.backgroundColor = selected ? UIColor(white: 0.28, alpha: 1) : .clear
+        btn.layer.cornerRadius = 14
+        btn.contentEdgeInsets = UIEdgeInsets(top: 6, left: 10, bottom: 6, right: 10)
+        btn.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        return btn
+    }
+
+    private func styleRoundChrome(_ btn: UIButton, systemName: String? = nil, title: String? = nil) {
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        btn.backgroundColor = UIColor(white: 0.22, alpha: 1)
+        btn.layer.cornerRadius = 22
+        btn.tintColor = .white
+        btn.setTitleColor(.white, for: .normal)
+        if let systemName {
+            let cfg = UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+            btn.setImage(UIImage(systemName: systemName, withConfiguration: cfg), for: .normal)
+        } else if let title {
+            btn.setTitle(title, for: .normal)
+            btn.titleLabel?.font = .systemFont(ofSize: 18, weight: .medium)
+        }
+    }
+
+    private func refreshModeChips() {
+        let voice = mode == .voice
+        let en = mode == .typingEN
+        let cn = mode == .typingCN
+        guard modeVoiceBtn != nil else { return }
+        for (btn, on) in [(modeVoiceBtn!, voice), (modeENBtn!, en), (modeCNBtn!, cn)] {
+            btn.backgroundColor = on ? UIColor(white: 0.28, alpha: 1) : .clear
+            btn.tintColor = on ? .white : UIColor(white: 0.65, alpha: 1)
+            btn.setTitleColor(on ? .white : UIColor(white: 0.65, alpha: 1), for: .normal)
+        }
     }
 
     private func buildTypingSurface() {
@@ -283,6 +400,7 @@ final class KeyboardView: UIView {
             surface.bottomAnchor.constraint(equalTo: contentHost.bottomAnchor),
         ])
 
+        refreshModeChips()
         if animated {
             surface.alpha = 0
             UIView.animate(withDuration: 0.18) { surface.alpha = 1 }
@@ -363,12 +481,19 @@ final class KeyboardView: UIView {
     private func styleMic(ready: Bool, recording: Bool) {
         if recording {
             micButton.backgroundColor = .systemRed
-            micButton.transform = CGAffineTransform(scaleX: 1.06, y: 1.06)
+            micButton.tintColor = .white
+            micButton.transform = CGAffineTransform(scaleX: 1.02, y: 1.02)
+            holdHint.text = "Listening… release to send"
         } else if ready {
-            micButton.backgroundColor = .systemOrange
+            micButton.backgroundColor = .white
+            micButton.tintColor = .black
             micButton.transform = .identity
+            if holdHint.text?.hasPrefix("Listening") == true || holdHint.text?.hasPrefix("Hold") == true || holdHint.text?.hasPrefix("Release") == true {
+                holdHint.text = "Tap to speak"
+            }
         } else {
-            micButton.backgroundColor = .systemGray3
+            micButton.backgroundColor = UIColor(white: 0.35, alpha: 1)
+            micButton.tintColor = UIColor(white: 0.75, alpha: 1)
             micButton.transform = .identity
         }
     }

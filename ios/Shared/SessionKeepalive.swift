@@ -8,6 +8,11 @@ import Foundation
 /// Without this, Darwin notifies and the command poll timer never fire once the
 /// user leaves the AFK app — the keyboard shows an orange mic (session.active
 /// still true in the App Group) but tap/hold does nothing.
+///
+/// Important: the session must stay **mixable** (`.mixWithOthers`). Activating a
+/// non-mixable session while backgrounded throws OSStatus 560557684 (`!int` =
+/// `AVAudioSessionErrorCodeCannotInterruptOthers`). Pure digital silence is also
+/// treated as "not playing" on some iOS builds — we emit a near-silent sine.
 @MainActor
 public final class SessionKeepalive {
     private var player: AVAudioPlayer?
@@ -16,16 +21,27 @@ public final class SessionKeepalive {
 
     public var isRunning: Bool { player?.isPlaying == true }
 
+    /// Shared mixable category used by keepalive and capture so background
+    /// reactivation never hits CannotInterruptOthers.
+    public static func activateMixableSession() throws {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(
+            .playAndRecord,
+            mode: .voiceChat,
+            options: [.mixWithOthers, .allowBluetoothHFP, .defaultToSpeaker]
+        )
+        try session.setActive(true)
+    }
+
     public func start() throws {
         if isRunning { return }
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .allowBluetoothHFP])
-        try session.setActive(true)
+        try Self.activateMixableSession()
 
-        let data = Self.silentWav(sampleRate: 8_000, seconds: 1.0)
+        let data = Self.nearSilentSineWav(sampleRate: 16_000, seconds: 1.0, frequency: 40, amplitude: 0.002)
         let player = try AVAudioPlayer(data: data)
-        // Volume 0 is ignored by the background audio assertion on some iOS builds.
-        player.volume = 0.01
+        // Non-zero volume + non-zero PCM — volume 0 / all-zero buffers are ignored
+        // by the background-audio assertion on some iOS builds.
+        player.volume = 0.05
         player.numberOfLoops = -1
         player.prepareToPlay()
         guard player.play() else {
@@ -34,13 +50,24 @@ public final class SessionKeepalive {
         self.player = player
     }
 
+    /// Stop playback but leave the AVAudioSession active (capture will own input).
+    public func pauseForCapture() {
+        player?.stop()
+        player = nil
+    }
+
     public func stop() {
         player?.stop()
         player = nil
     }
 
-    /// Minimal PCM16 mono WAV of silence.
-    private static func silentWav(sampleRate: Int, seconds: Double) -> Data {
+    /// Near-silent PCM16 mono WAV (tiny sine, not digital zero).
+    private static func nearSilentSineWav(
+        sampleRate: Int,
+        seconds: Double,
+        frequency: Double,
+        amplitude: Double
+    ) -> Data {
         let frames = Int(Double(sampleRate) * seconds)
         let dataSize = frames * 2
         var data = Data()
@@ -68,7 +95,14 @@ public final class SessionKeepalive {
         appendUInt16(16) // bits
         data.append(contentsOf: Array("data".utf8))
         appendUInt32(UInt32(dataSize))
-        data.append(Data(count: dataSize))
+
+        let twoPiF = 2.0 * Double.pi * frequency
+        for i in 0..<frames {
+            let sample = sin(twoPiF * Double(i) / Double(sampleRate)) * amplitude
+            let clamped = max(-1.0, min(1.0, sample))
+            var le = Int16(clamped * Double(Int16.max)).littleEndian
+            withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
+        }
         return data
     }
 }

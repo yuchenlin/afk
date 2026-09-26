@@ -48,7 +48,8 @@ struct ContentView: View {
                     .padding(.horizontal)
                 }
 
-                if let err = session.errorMessage {
+                // Only show keepalive/error banner when it contradicts success state.
+                if let err = session.errorMessage, !(session.keepaliveRunning && err.hasPrefix("Background audio keepalive failed:")) {
                     Text(err)
                         .font(.footnote)
                         .foregroundStyle(.red)

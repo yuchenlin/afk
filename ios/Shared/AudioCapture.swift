@@ -3,6 +3,10 @@ import Foundation
 
 /// iOS mic capture → 16 kHz mono PCM16 (matches Mac STT format).
 /// Uses AVAudioEngine only — no Core Audio device list (Mac-only).
+///
+/// Category is always **mixable** (`.mixWithOthers`) so starting capture while
+/// the host is backgrounded does not throw OSStatus 560557684 (`!int` =
+/// CannotInterruptOthers). Do not use `.duckOthers` alone — that is non-mixable.
 @MainActor
 public final class AudioCapture {
     public static let sampleRate = PCMWav.defaultSampleRate
@@ -38,9 +42,9 @@ public final class AudioCapture {
         guard !isRecording else { return }
         pcm = Data()
 
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker])
-        try session.setActive(true, options: .notifyOthersOnDeactivation)
+        // Reuse the same mixable playAndRecord session as SessionKeepalive.
+        // Activating a non-mixable category in background → !int (560557684).
+        try SessionKeepalive.activateMixableSession()
 
         let engine = AVAudioEngine()
         let input = engine.inputNode
