@@ -28,3 +28,6 @@ eval/recordings/
 # Release packaging
 /dist/
 *.dmg
+
+# iOS local signing
+ios/Config/Signing.xcconfig

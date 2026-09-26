@@ -187,11 +187,15 @@ scripts/make-dmg.sh    package AFK.app into dist/AFK-VERSION.dmg
 
 The logo is `design/logo/afk-logo-dark.svg` (and `-light`): two eyes above a sound-wave smile. `Sources/AFKCore/LogoMark.swift` holds the same geometry and draws the menu bar icon; `make icons` renders `Resources/AppIcon.icns` (bundled into the app) plus `design/icons/` — the macOS iconset and `ios-AppIcon-1024.png` (square, opaque, for the App Store). Earlier logo explorations are in `design/logo/candidates/`.
 
+## iOS (WIP)
+
+An early **iOS host app + keyboard extension** scaffold lives in [`ios/`](ios/). Custom keyboards cannot use the mic, so the host records (background audio) and relays text through an App Group — same pattern as Typeless/Wispr. **Not App Store ready.** Open `ios/AFK-iOS.xcodeproj`, set your Team / App Group, run on a device or simulator. Details: [`ios/README.md`](ios/README.md).
+
 ## Roadmap
 
 1. ~~Mac shell + hold-to-talk shortcut + paste~~
 2. ~~Real mic + Grok Voice Transcribe streaming~~
 3. ~~Lexicon + light polish~~
 4. zh–en mix eval vs Fun-ASR
-5. iOS keyboard relay
+5. iOS keyboard relay — **scaffold in `ios/` (WIP)**
 6. ~~Notarized GitHub Releases DMG (Developer ID)~~

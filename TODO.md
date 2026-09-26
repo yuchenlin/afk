@@ -43,14 +43,16 @@ Follow-ups from the release plan. Background, reasoning and sources: [docs/RELEA
 
 Constraint: custom keyboards can't use the microphone, so the main app records and hands text to the keyboard.
 
-- [ ] **Phase 0** — extract a shared Swift package (`AFKKit`: providers, Grok streaming, batch speech, polish, vocabulary, history, audio recording); keep the macOS app and its tests green
-- [ ] **Phase 1** — iOS app: record → transcribe → polish → copy/share; settings, vocabulary, history; TestFlight
+> **WIP scaffold shipped** in [`ios/`](ios/) (`AFK-iOS.xcodeproj`: host + keyboard + App Group relay + mock/Grok batch STT). Not App Store ready; Mac `Package.swift` / `make build` unchanged. See [`ios/README.md`](ios/README.md).
+
+- [ ] **Phase 0** — extract a shared Swift package (`AFKKit`: providers, Grok streaming, batch speech, polish, vocabulary, history, audio recording); keep the macOS app and its tests green — *iOS currently uses `ios/Shared` stand-ins*
+- [x] **Phase 1 (scaffold)** — iOS app shell: record → mock/Grok batch → polish stub → App Group; settings + Keychain; onboarding — *vocabulary/history/TestFlight still open*
 - [ ] **Phase 2** — App Intents: Action Button, Shortcuts, Control Center control, Live Activity / Dynamic Island; result copied to clipboard
-- [ ] **Phase 3** — keyboard extension:
-  - [ ] Basic typing layout + globe (next keyboard) key (Guideline 4.4.1)
-  - [ ] Works without Full Access for typing; explains dictation needs the app + Full Access
-  - [ ] Background "session" in the main app (5 / 15 / 60 min setting, mic indicator visible)
-  - [ ] Start/stop via Darwin notifications, text hand-off via App Group, insert with `textDocumentProxy`
+- [x] **Phase 3 (scaffold)** — keyboard extension:
+  - [x] Basic typing layout + globe (next keyboard) key (Guideline 4.4.1) — *WIP UI*
+  - [x] Works without Full Access for typing; explains dictation needs the app + Full Access
+  - [x] Background "session" in the main app (5 / 15 / 60 min setting, mic indicator visible) — *basic audio session*
+  - [x] Start/stop via Darwin notifications, text hand-off via App Group, insert with `textDocumentProxy`
   - [ ] Verify how the keyboard can start a session (opening the app from a keyboard is a review gray area)
 - [ ] **Phase 4** — optional iCloud (CloudKit) sync of vocabulary and history between Mac and iPhone
 - [ ] **Phase 5** — App Store submission: consent flow, privacy policy, screenshots

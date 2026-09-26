@@ -86,9 +86,9 @@ Mac-only pieces stay out of `AFKKit`: `KeyMonitor`, `TextInjector`, AppKit windo
 | Phase | Scope | Notes |
 |---|---|---|
 | 0 | Extract `AFKKit`; keep macOS app green | pure refactor, tests move with code |
-| 1 | iOS app: record → Grok/other providers → polish → copy; settings, vocabulary, history | TestFlight |
+| 1 | iOS app: record → Grok/other providers → polish → copy; settings, vocabulary, history | TestFlight — **WIP scaffold in `ios/`** |
 | 2 | App Intents: Action Button, Shortcuts, Control Center control, Live Activity | biggest UX win per effort |
-| 3 | Keyboard extension + session relay + basic typing layout | most review risk; needs real devices |
+| 3 | Keyboard extension + session relay + basic typing layout | most review risk — **WIP scaffold in `ios/`** |
 | 4 | Optional iCloud sync of vocabulary/history between Mac and iPhone | CloudKit |
 | 5 | App Store submission | consent flow, privacy policy, screenshots |
 

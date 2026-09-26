@@ -187,11 +187,15 @@ scripts/make-dmg.sh    将 AFK.app 打成 dist/AFK-VERSION.dmg
 
 Logo 为 `design/logo/afk-logo-dark.svg`（及 `-light`）：两只眼睛上方是声波微笑。`Sources/AFKCore/LogoMark.swift` 使用相同几何绘制菜单栏图标；`make icons` 生成 `Resources/AppIcon.icns`（打进应用包）以及 `design/icons/` — macOS iconset 与 `ios-AppIcon-1024.png`（正方形、不透明，供 App Store）。早期 Logo 探索在 `design/logo/candidates/`。
 
+## iOS（WIP）
+
+[`ios/`](ios/) 下有早期的 **iOS 宿主 App + 键盘扩展** 脚手架。自定义键盘无法使用麦克风，因此由宿主录音（后台音频）并通过 App Group 回传文本——与 Typeless/Wispr 相同。**尚未准备上架 App Store。** 打开 `ios/AFK-iOS.xcodeproj`，设置 Team / App Group 后在真机或模拟器运行。说明见 [`ios/README.md`](ios/README.md)。
+
 ## 路线图
 
 1. ~~Mac 壳 + 按住说话快捷键 + 粘贴~~
 2. ~~真实麦克风 + Grok Voice Transcribe 流式~~
 3. ~~词汇表 + 轻度润色~~
 4. 中英混合评测 vs Fun-ASR
-5. iOS 键盘中继
+5. iOS 键盘中继 — **`ios/` 脚手架（WIP）**
 6. ~~经公证的 GitHub Releases DMG（Developer ID）~~

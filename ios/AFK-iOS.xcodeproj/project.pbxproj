@@ -1,0 +1,528 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		004B5555FAC981761741EE1D /* AudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7ADDDB356A180CC242A157B /* AudioCapture.swift */; };
+		026278389A6B40B5C93FF1AB /* AppGroupConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = A388F0BF6E22BFE34EC01512 /* AppGroupConstants.swift */; };
+		090E8910A8E082833BE2CA0A /* IOSSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E94D4A220AD9F16912BE17A /* IOSSettings.swift */; };
+		0BEC925CC2BD5A2EC49779E9 /* AFKKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CB9B516D9230B085E472B7C5 /* AFKKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		0FF272159E10F4A4B157E740 /* PCMWav.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9191A3E34726EF0CCF199F5 /* PCMWav.swift */; };
+		1151D2D1292607598D275380 /* DictationSessionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E479D8CF811090FE61F1ECD8 /* DictationSessionController.swift */; };
+		1B919D9DA869C9DD7883AC01 /* AFKApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A351D450004AF56858165973 /* AFKApp.swift */; };
+		1DD7E7147588C2CB7408C060 /* SessionRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 039253DB261DD916A4ADF1DB /* SessionRelay.swift */; };
+		28CB4D2895964E3851084899 /* AudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7ADDDB356A180CC242A157B /* AudioCapture.swift */; };
+		28F349764E271191D5AFA7C4 /* GrokBatchSpeechClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BB709886DC6A2FD48C192D /* GrokBatchSpeechClient.swift */; };
+		2F92CF270E1D1D418A6EC918 /* SessionRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 039253DB261DD916A4ADF1DB /* SessionRelay.swift */; };
+		3D0FAE9A9F61D0333DD3E17E /* MockSpeechProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3729EE1C2DC0F85BAC53E12E /* MockSpeechProvider.swift */; };
+		45098BE3C2B627BD2A93B31B /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 926C0C6E7FEA1899C88C34D5 /* KeyboardViewController.swift */; };
+		45356948F7925C83EA41C1D4 /* SimplePolisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95C59A4F1FF66BCA0176D1DE /* SimplePolisher.swift */; };
+		522F56D50EFF61622CA19C8C /* DarwinNotify.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C02928DA2EA10CB814C54C /* DarwinNotify.swift */; };
+		70C6DE11B9F3B28BBB63A8D5 /* PCMWav.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9191A3E34726EF0CCF199F5 /* PCMWav.swift */; };
+		7EEAC59D0F463312B2493937 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE71EE69BEEC537B8B566B77 /* KeychainStore.swift */; };
+		8A643D445C21F650F2F5BAF6 /* SimplePolisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95C59A4F1FF66BCA0176D1DE /* SimplePolisher.swift */; };
+		8AB920FA2F8585C37D2C0B08 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE71EE69BEEC537B8B566B77 /* KeychainStore.swift */; };
+		92BDFD7C173DFC87AC8EB8D6 /* SpeechProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D1D39EB47EAC68C5AB5EEC8 /* SpeechProvider.swift */; };
+		955BAA63F083BADDEC83061E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E5B977C964C6F2C6EE5F5CE /* ContentView.swift */; };
+		AF9F3A65926DB5C4C5A8F318 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8472317070F32DD0BF14E0E1 /* Assets.xcassets */; };
+		B607DBA6214251986E58FB94 /* MockSpeechProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3729EE1C2DC0F85BAC53E12E /* MockSpeechProvider.swift */; };
+		BD3B64F311F7429CBEBFE0B0 /* DarwinNotify.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C02928DA2EA10CB814C54C /* DarwinNotify.swift */; };
+		BF534EDDA8BDDFF168618F8B /* AppGroupConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = A388F0BF6E22BFE34EC01512 /* AppGroupConstants.swift */; };
+		C6EF0009C89C8211B0FC1498 /* IOSSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E94D4A220AD9F16912BE17A /* IOSSettings.swift */; };
+		CA44BBAFE1046BD4C302B233 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19EE92ECDC6803FDE679FB0 /* SettingsView.swift */; };
+		D94D0309389043BE174FAAF4 /* SpeechProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D1D39EB47EAC68C5AB5EEC8 /* SpeechProvider.swift */; };
+		E0775DA45D34011D9AFE9B8A /* GrokBatchSpeechClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BB709886DC6A2FD48C192D /* GrokBatchSpeechClient.swift */; };
+		F33CCCEA86CDAB7DC15F3C7F /* KeyboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 936F2201530EDC979B5FF603 /* KeyboardView.swift */; };
+		F768322C7381C24BD302B29E /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D99CA00EC588E0C39990B3 /* OnboardingView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		088DA9607F2E6BB78E9E866D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 58A50B26176D1746F8C7B2DA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B71A15F7877BD64AFC35A6A7;
+			remoteInfo = AFKKeyboard;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		8F9183646EC8751A05F34771 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				0BEC925CC2BD5A2EC49779E9 /* AFKKeyboard.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		039253DB261DD916A4ADF1DB /* SessionRelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRelay.swift; sourceTree = "<group>"; };
+		1D1D39EB47EAC68C5AB5EEC8 /* SpeechProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechProvider.swift; sourceTree = "<group>"; };
+		33CAD3D2B33678FF1B104A94 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		3729EE1C2DC0F85BAC53E12E /* MockSpeechProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockSpeechProvider.swift; sourceTree = "<group>"; };
+		37D99CA00EC588E0C39990B3 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		3E94D4A220AD9F16912BE17A /* IOSSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSSettings.swift; sourceTree = "<group>"; };
+		4E5B977C964C6F2C6EE5F5CE /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		8472317070F32DD0BF14E0E1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		8BC9764F019B597126B82FA6 /* AFK.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AFK.entitlements; sourceTree = "<group>"; };
+		926C0C6E7FEA1899C88C34D5 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
+		936F2201530EDC979B5FF603 /* KeyboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardView.swift; sourceTree = "<group>"; };
+		95C59A4F1FF66BCA0176D1DE /* SimplePolisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePolisher.swift; sourceTree = "<group>"; };
+		A19EE92ECDC6803FDE679FB0 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A351D450004AF56858165973 /* AFKApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AFKApp.swift; sourceTree = "<group>"; };
+		A388F0BF6E22BFE34EC01512 /* AppGroupConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGroupConstants.swift; sourceTree = "<group>"; };
+		A758F6BE6F9F9882A1F3D925 /* AFK.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AFK.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B0BB709886DC6A2FD48C192D /* GrokBatchSpeechClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrokBatchSpeechClient.swift; sourceTree = "<group>"; };
+		B9191A3E34726EF0CCF199F5 /* PCMWav.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PCMWav.swift; sourceTree = "<group>"; };
+		C211D4133308F764E614C008 /* AFKKeyboard.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AFKKeyboard.entitlements; sourceTree = "<group>"; };
+		C6398375D3281898E12312F8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		CB9B516D9230B085E472B7C5 /* AFKKeyboard.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = AFKKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D7ADDDB356A180CC242A157B /* AudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCapture.swift; sourceTree = "<group>"; };
+		E479D8CF811090FE61F1ECD8 /* DictationSessionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationSessionController.swift; sourceTree = "<group>"; };
+		EE71EE69BEEC537B8B566B77 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		F2C02928DA2EA10CB814C54C /* DarwinNotify.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarwinNotify.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0DB77EE183EC67C74AA52912 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A758F6BE6F9F9882A1F3D925 /* AFK.app */,
+				CB9B516D9230B085E472B7C5 /* AFKKeyboard.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		3554BF6589F9144FBBDEEBF3 = {
+			isa = PBXGroup;
+			children = (
+				C7B9AA4E959E4B717FB68EBC /* AFK */,
+				3BF39506C3216D48605FF94A /* AFKKeyboard */,
+				DE95CC31588AD8D33F5BF951 /* Shared */,
+				0DB77EE183EC67C74AA52912 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		3BF39506C3216D48605FF94A /* AFKKeyboard */ = {
+			isa = PBXGroup;
+			children = (
+				C211D4133308F764E614C008 /* AFKKeyboard.entitlements */,
+				C6398375D3281898E12312F8 /* Info.plist */,
+				936F2201530EDC979B5FF603 /* KeyboardView.swift */,
+				926C0C6E7FEA1899C88C34D5 /* KeyboardViewController.swift */,
+			);
+			path = AFKKeyboard;
+			sourceTree = "<group>";
+		};
+		C7B9AA4E959E4B717FB68EBC /* AFK */ = {
+			isa = PBXGroup;
+			children = (
+				8BC9764F019B597126B82FA6 /* AFK.entitlements */,
+				A351D450004AF56858165973 /* AFKApp.swift */,
+				8472317070F32DD0BF14E0E1 /* Assets.xcassets */,
+				4E5B977C964C6F2C6EE5F5CE /* ContentView.swift */,
+				E479D8CF811090FE61F1ECD8 /* DictationSessionController.swift */,
+				33CAD3D2B33678FF1B104A94 /* Info.plist */,
+				37D99CA00EC588E0C39990B3 /* OnboardingView.swift */,
+				A19EE92ECDC6803FDE679FB0 /* SettingsView.swift */,
+			);
+			path = AFK;
+			sourceTree = "<group>";
+		};
+		DE95CC31588AD8D33F5BF951 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				A388F0BF6E22BFE34EC01512 /* AppGroupConstants.swift */,
+				D7ADDDB356A180CC242A157B /* AudioCapture.swift */,
+				F2C02928DA2EA10CB814C54C /* DarwinNotify.swift */,
+				B0BB709886DC6A2FD48C192D /* GrokBatchSpeechClient.swift */,
+				3E94D4A220AD9F16912BE17A /* IOSSettings.swift */,
+				EE71EE69BEEC537B8B566B77 /* KeychainStore.swift */,
+				3729EE1C2DC0F85BAC53E12E /* MockSpeechProvider.swift */,
+				B9191A3E34726EF0CCF199F5 /* PCMWav.swift */,
+				039253DB261DD916A4ADF1DB /* SessionRelay.swift */,
+				95C59A4F1FF66BCA0176D1DE /* SimplePolisher.swift */,
+				1D1D39EB47EAC68C5AB5EEC8 /* SpeechProvider.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B71A15F7877BD64AFC35A6A7 /* AFKKeyboard */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 09B4A0BBF1FEF1A9409FCA9F /* Build configuration list for PBXNativeTarget "AFKKeyboard" */;
+			buildPhases = (
+				4BB616758E7F1FC76B8E78B0 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = AFKKeyboard;
+			packageProductDependencies = (
+			);
+			productName = AFKKeyboard;
+			productReference = CB9B516D9230B085E472B7C5 /* AFKKeyboard.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		F55344A4736E951784561B12 /* AFK */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B61A8169E0E6B752A3EA4AEB /* Build configuration list for PBXNativeTarget "AFK" */;
+			buildPhases = (
+				044343452ED8B865AFB7CDB7 /* Sources */,
+				52552F3D4AFDB7EE5C7CFF32 /* Resources */,
+				8F9183646EC8751A05F34771 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E607C54AADD1DC0BAA48C161 /* PBXTargetDependency */,
+			);
+			name = AFK;
+			packageProductDependencies = (
+			);
+			productName = AFK;
+			productReference = A758F6BE6F9F9882A1F3D925 /* AFK.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		58A50B26176D1746F8C7B2DA /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					B71A15F7877BD64AFC35A6A7 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					F55344A4736E951784561B12 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = B86F7B4F37AB28BF630E8000 /* Build configuration list for PBXProject "AFK-iOS" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 3554BF6589F9144FBBDEEBF3;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 0DB77EE183EC67C74AA52912 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F55344A4736E951784561B12 /* AFK */,
+				B71A15F7877BD64AFC35A6A7 /* AFKKeyboard */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		52552F3D4AFDB7EE5C7CFF32 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AF9F3A65926DB5C4C5A8F318 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		044343452ED8B865AFB7CDB7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1B919D9DA869C9DD7883AC01 /* AFKApp.swift in Sources */,
+				026278389A6B40B5C93FF1AB /* AppGroupConstants.swift in Sources */,
+				28CB4D2895964E3851084899 /* AudioCapture.swift in Sources */,
+				955BAA63F083BADDEC83061E /* ContentView.swift in Sources */,
+				522F56D50EFF61622CA19C8C /* DarwinNotify.swift in Sources */,
+				1151D2D1292607598D275380 /* DictationSessionController.swift in Sources */,
+				28F349764E271191D5AFA7C4 /* GrokBatchSpeechClient.swift in Sources */,
+				090E8910A8E082833BE2CA0A /* IOSSettings.swift in Sources */,
+				7EEAC59D0F463312B2493937 /* KeychainStore.swift in Sources */,
+				3D0FAE9A9F61D0333DD3E17E /* MockSpeechProvider.swift in Sources */,
+				F768322C7381C24BD302B29E /* OnboardingView.swift in Sources */,
+				70C6DE11B9F3B28BBB63A8D5 /* PCMWav.swift in Sources */,
+				1DD7E7147588C2CB7408C060 /* SessionRelay.swift in Sources */,
+				CA44BBAFE1046BD4C302B233 /* SettingsView.swift in Sources */,
+				8A643D445C21F650F2F5BAF6 /* SimplePolisher.swift in Sources */,
+				92BDFD7C173DFC87AC8EB8D6 /* SpeechProvider.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4BB616758E7F1FC76B8E78B0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BF534EDDA8BDDFF168618F8B /* AppGroupConstants.swift in Sources */,
+				004B5555FAC981761741EE1D /* AudioCapture.swift in Sources */,
+				BD3B64F311F7429CBEBFE0B0 /* DarwinNotify.swift in Sources */,
+				E0775DA45D34011D9AFE9B8A /* GrokBatchSpeechClient.swift in Sources */,
+				C6EF0009C89C8211B0FC1498 /* IOSSettings.swift in Sources */,
+				F33CCCEA86CDAB7DC15F3C7F /* KeyboardView.swift in Sources */,
+				45098BE3C2B627BD2A93B31B /* KeyboardViewController.swift in Sources */,
+				8AB920FA2F8585C37D2C0B08 /* KeychainStore.swift in Sources */,
+				B607DBA6214251986E58FB94 /* MockSpeechProvider.swift in Sources */,
+				0FF272159E10F4A4B157E740 /* PCMWav.swift in Sources */,
+				2F92CF270E1D1D418A6EC918 /* SessionRelay.swift in Sources */,
+				45356948F7925C83EA41C1D4 /* SimplePolisher.swift in Sources */,
+				D94D0309389043BE174FAAF4 /* SpeechProvider.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		E607C54AADD1DC0BAA48C161 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B71A15F7877BD64AFC35A6A7 /* AFKKeyboard */;
+			targetProxy = 088DA9607F2E6BB78E9E866D /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		085558EBC303124D154D6EA6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AFK/AFK.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AFK/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.yuchenlin.afk.ios;
+				PRODUCT_NAME = AFK;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		21AF61D15CBA74ACC8271BC0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AFK/AFK.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AFK/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.yuchenlin.afk.ios;
+				PRODUCT_NAME = AFK;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		28B982ACC495431EC89134D1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		85C7E4CD09BCA25BC293FAC6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = AFKKeyboard/AFKKeyboard.entitlements;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AFKKeyboard/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.yuchenlin.afk.ios.keyboard;
+				PRODUCT_NAME = AFKKeyboard;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		99990F6F702D161D2B969AD6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D4FB70DC99917B50B236465F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = AFKKeyboard/AFKKeyboard.entitlements;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AFKKeyboard/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.yuchenlin.afk.ios.keyboard;
+				PRODUCT_NAME = AFKKeyboard;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		09B4A0BBF1FEF1A9409FCA9F /* Build configuration list for PBXNativeTarget "AFKKeyboard" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				85C7E4CD09BCA25BC293FAC6 /* Debug */,
+				D4FB70DC99917B50B236465F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B61A8169E0E6B752A3EA4AEB /* Build configuration list for PBXNativeTarget "AFK" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				085558EBC303124D154D6EA6 /* Debug */,
+				21AF61D15CBA74ACC8271BC0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B86F7B4F37AB28BF630E8000 /* Build configuration list for PBXProject "AFK-iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				28B982ACC495431EC89134D1 /* Debug */,
+				99990F6F702D161D2B969AD6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 58A50B26176D1746F8C7B2DA /* Project object */;
+}

@@ -81,6 +81,8 @@ Default hotkey is **⌘G**, configurable from the menu (Fn, or any recorded comb
 
 ### iOS (later)
 
+> **WIP:** host + keyboard scaffold lives in [`ios/`](../ios/) (branch work may land on `wip/ios`). Still not App Store ready.
+
 Hard limits: keyboard extension **cannot** open the mic; ~30–60MB memory; Full Access required for App Group.
 
 Pattern: Keyboard UI → App Group start/stop → **Host app** records + STT → result → `insertText`. Set `hasDictationKey = true`. Floating overlay / Share Sheet are weaker UX for chat boxes.
