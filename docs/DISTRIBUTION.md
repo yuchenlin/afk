@@ -1,0 +1,124 @@
+# Distribution (Mac)
+
+How AFK reaches other Macs: DMG packaging, Gatekeeper, Developer ID + notarization, and GitHub Releases. Day-to-day local installs stay on `make install` — see [BUILD.md](BUILD.md).
+
+## Channels
+
+| Channel | Who it is for | Gatekeeper |
+|---|---|---|
+| **Build from source** (`make install`) | Developers / early adopters with Xcode | Uses Apple Development or `make dev-cert` on *that* Mac; grants survive rebuilds |
+| **GitHub Releases DMG** (planned) | Everyone else | Needs **Developer ID Application** + **notarization** + staple for a double-click open |
+| **Mac App Store** (later) | Store users | Sandboxed build; see [RELEASE_PLAN.md](RELEASE_PLAN.md) |
+
+Recommendation (unchanged from the release plan): ship **direct download first** (GitHub Releases + optional Sparkle), then a sandboxed App Store build.
+
+## PiggyHouse status (checked locally)
+
+On the build Mac used for this work:
+
+- **Codesigning identities:** `Apple Development: …` only — **no** `Developer ID Application: …`.
+- **Notary:** `xcrun notarytool` is available; **no** keychain profile is stored yet (`store-credentials` has not been run for AFK).
+- **Implication:** Xcode → Settings → Accounts (signed into the Apple Developer team) gives you **Apple Development** for local builds/TCC. It does **not** by itself create a **Developer ID Application** certificate. Stranger installs still need the steps below.
+
+Re-check anytime:
+
+```bash
+security find-identity -v -p codesigning
+# Look for: Developer ID Application: Your Name (TEAMID)
+xcrun notarytool history --keychain-profile AFK-notary   # after you create that profile
+```
+
+## Creating Developer ID (after Program enrollment)
+
+1. Confirm membership at [developer.apple.com/account](https://developer.apple.com/account) (paid Apple Developer Program).
+2. **Certificates, Identifiers & Profiles** → Certificates → **+** → **Developer ID Application** → follow the CSR flow (Keychain Access → Certificate Assistant → Request a Certificate From a Certificate Authority), download, double-click to install.
+   - Or in **Xcode → Settings → Accounts → [team] → Manage Certificates… → + → Developer ID Application**.
+3. Verify: `security find-identity -v -p codesigning` lists `Developer ID Application: …`.
+4. Only then will `make dmg` re-sign with Developer ID (Hardened Runtime). Still run notarization separately (next section).
+
+## DMG packaging (what we have today)
+
+
+```bash
+make dmg          # make build → scripts/make-dmg.sh → dist/AFK-<version>.dmg
+```
+
+The DMG contains `AFK.app` and an `Applications` symlink (drag-to-install). `scripts/make-dmg.sh` **re-signs with Developer ID Application** when that identity exists; otherwise it keeps the signature from `make build` (Apple Development / Local Dev / ad-hoc) and prints a Gatekeeper warning.
+
+### What has / has not been tested
+
+- **Tested:** producing a UDZO DMG with `hdiutil` via `scripts/make-dmg.sh` / `make dmg` on a developer Mac (Apple Development–signed app inside).
+- **Not done:** **Developer ID Application** identity is not in the keychain yet; no notary keychain profile; no stapled Release asset. `make dmg` will auto-prefer Developer ID once that cert exists.
+
+### Why Apple Development is not enough for strangers
+
+| Identity | Good for | Other people’s Macs |
+|---|---|---|
+| Ad-hoc (`codesign -`) | Local smoke tests | Gatekeeper blocks; TCC grants reset every rebuild |
+| **AFK Local Dev** (self-signed) | Stable local TCC while developing | Gatekeeper blocks / warns; not trusted elsewhere |
+| **Apple Development** | Your Macs signed into that team | **Does not** satisfy Gatekeeper on other users’ Macs |
+| **Developer ID Application** + notarize + staple | Direct download | Double-click install (with a brief first-open prompt at most) |
+| App Store distribution cert | Mac App Store only | Via the Store |
+
+So a DMG built on a laptop with only Apple Development is still useful as **packaging practice** and for CI artifact checks — it is **not** a shippable download for end users.
+
+## Gatekeeper: opening an unnotarized / unsigned build
+
+If someone downloads a DMG or `.app` that is not Developer ID–notarized, macOS may say the app “can’t be opened because Apple cannot check it for malicious software.” Workarounds (same idea on recent macOS):
+
+1. **Right-click (or Control-click) the app → Open → Open** in the dialog, or
+2. **System Settings → Privacy & Security** → scroll to the message about AFK → **Open Anyway**, then confirm.
+
+This is expected for unsigned / unnotarized / Apple Development–signed builds. It is **not** a substitute for proper release signing.
+
+## Checklist: frictionless install for strangers
+
+Do **not** paste Apple ID passwords, app-specific passwords, or `.p8` API keys into chat or commit them. Store them only via `notarytool store-credentials` (Keychain) or CI secrets.
+
+1. Enroll in the [Apple Developer Program](https://developer.apple.com/programs/) ($99/year) if not already.
+2. Create and install a **Developer ID Application** certificate (portal or Xcode Manage Certificates) — see above. Xcode account login alone is not enough.
+3. `make dmg` — when Developer ID is present, the script re-signs with Hardened Runtime and writes `dist/AFK-VERSION.dmg`.
+4. **Once**, store notary credentials in the Keychain (pick one method; interactive prompts are fine):
+
+   ```bash
+   # Option A — Apple ID + app-specific password (appleid.apple.com → Sign-In and Security
+   # → App-Specific Passwords). Team ID is on developer.apple.com → Membership.
+   xcrun notarytool store-credentials AFK-notary \
+     --apple-id "YOUR_APPLE_ID@example.com" \
+     --team-id "YOUR_TEAM_ID" \
+     --password   # omit value to get a secure prompt
+
+   # Option B — App Store Connect API key (.p8 + Key ID + Issuer ID)
+   xcrun notarytool store-credentials AFK-notary \
+     --key /path/to/AuthKey_XXXXX.p8 \
+     --key-id "XXXXXXXXXX" \
+     --issuer "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+   ```
+
+5. Submit and staple (profile name must match what you stored):
+
+   ```bash
+   xcrun notarytool submit dist/AFK-VERSION.dmg --keychain-profile AFK-notary --wait
+   xcrun stapler staple dist/AFK-VERSION.dmg
+   ```
+
+6. Verify on a clean Mac (not your team): `spctl --assess -vv /path/to/AFK.app`, then open normally.
+7. Attach the stapled DMG to a **GitHub Release** and link it from the README.
+
+Optional later: Sparkle for auto-update (direct channel); App Store sandbox + review path in [RELEASE_PLAN.md](RELEASE_PLAN.md).
+
+## GitHub Releases workflow (outline)
+
+1. Bump `CFBundleShortVersionString` / `CFBundleVersion` in `Supporting/Info.plist`.
+2. On a machine (or CI runner) with **Developer ID** + notarization credentials: `make dmg`, then notarize + staple.
+3. `git tag vX.Y.Z && git push origin vX.Y.Z`.
+4. Create a GitHub Release for that tag; upload `dist/AFK-X.Y.Z.dmg`.
+5. Point the README “Download” link at the latest Release asset.
+
+Until the first notarized asset exists, the README should say Releases are coming and keep **build from source** as the working install path.
+
+## Related
+
+- [BUILD.md](BUILD.md) — local Xcode build, `make install`, stable signing for TCC
+- [RELEASE_PLAN.md](RELEASE_PLAN.md) — open source checklist, App Store vs direct, iOS
+- `scripts/make-dmg.sh` — DMG packaging only (no notarization)

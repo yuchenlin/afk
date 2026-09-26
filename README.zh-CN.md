@@ -4,7 +4,9 @@
 
 **Away From Keyboard（暂时离开键盘）** — 按住快捷键（默认 **⌘G**，也可选 **Fn**），说话，文字就会出现在光标处。优先支持 macOS 菜单栏应用。
 
-按住快捷键 → 麦克风音频流式发送到你选择的语音转写（STT）服务（屏幕上的胶囊实时显示文字）→ 松开 → 文字粘贴到光标位置。
+## AFK 是做什么的
+
+按住快捷键 → 麦克风音频流式发送到你选择的语音转写（STT）服务（屏幕上的胶囊实时显示文字）→ 松开 → 转写粘贴到光标位置。可选润色会去掉语气词等，但不改写你说的内容。
 
 > 欢迎贡献截图 / 演示 GIF — 有干净素材欢迎提 PR。
 
@@ -20,17 +22,42 @@
 
 见 [docs/PRIOR_ART.md](docs/PRIOR_ART.md)。Fn + 粘贴改编自 [Scribe](https://github.com/xiangst0816/scribe)（MIT）。
 
-## 安装（Mac）
+## 下载与安装（Mac）
+
+### 1. 推荐：GitHub Releases DMG *（随首次 Release 推出）*
+
+发布经公证（notarized）的构建后，请从 [GitHub Releases](https://github.com/yuchenlin/afk/releases) 下载 **`AFK-*.dmg`**，打开磁盘映像，将 **AFK.app** 拖入 **应用程序**。
+
+在该资源出现之前，请使用下方的**从源码构建**。本地已支持打包 DMG（`make dmg` → `dist/AFK-VERSION.dmg`）；要给陌生人无摩擦安装，仍需 Apple **Developer ID** + 公证 — 详见 [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)（英文）。
+
+#### Gatekeeper（未签名 / 未公证 / 仅 Apple Development）
+
+macOS 可能提示无法打开，因为「无法检查是否包含恶意软件」。在提供 Developer ID 公证的 Release 之前，这是预期行为。可以这样打开：
+
+1. **右键**（或 Control-单击）**AFK.app** → **打开** → 再点 **打开**，或
+2. **系统设置 → 隐私与安全性** → 找到有关 AFK 的提示 → **仍要打开**，然后确认。
+
+**如实说明：** 要让其他人的 Mac 双击即可安装，需要加入 [Apple Developer Program](https://developer.apple.com/programs/)、**Developer ID Application** 证书、`notarytool` 公证并装订（staple）。在 Xcode → Settings → Accounts 登录（得到 Apple Development）**并不等于**已创建 Developer ID 证书。Apple Development 或本地的 `make dev-cert` 只适合在*你自己的* Mac 上保持辅助功能/麦克风授权跨重建有效 — **不能**让其他机器的 Gatekeeper 放行。清单见 [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)。
+
+### 2. 从源码构建
+
+需要 macOS 上的 **完整 Xcode.app**（仅安装 Command Line Tools 时，近期 Swift 工具链会因隐晦的 plist 解析错误而失败）。
 
 ```bash
 git clone https://github.com/yuchenlin/afk.git
 cd afk
-make install        # → /Applications/AFK.app（使用 Apple Development 或 `make dev-cert`）
+make install        # → /Applications/AFK.app（Apple Development 或 `make dev-cert`）
 make api-key        # 可选：将 $XAI_API_KEY_VOICE 写入密钥文件（也可在「设置…」中粘贴）
 open /Applications/AFK.app
 ```
 
-需要 macOS 上的 **完整 Xcode.app**（仅安装 Command Line Tools 时，近期 Swift 工具链会因隐晦的 plist 解析错误而失败）。
+可选打包（签名与 `make build` 相同；未公证）：
+
+```bash
+make dmg            # → dist/AFK-<version>.dmg
+```
+
+更多构建说明：[docs/BUILD.md](docs/BUILD.md)。
 
 ### 权限
 
@@ -38,9 +65,70 @@ open /Applications/AFK.app
 
 `make install` 使用稳定身份签名（若有 Apple Development 则用之，否则 `make dev-cert`），使授权在**重建后仍然保留**。临时签名（`codesign -`）每次构建都会改变 CDHash，macOS 会忘记授权 — `make install` 会拒绝这种签名。若曾从临时签名安装切换过来，请先在「辅助功能」中删除幽灵 **AFK** 条目，再为新的 `/Applications/AFK.app` 启用一次。
 
-### API 密钥（自带密钥 BYOK）
+## API 密钥教程（自带密钥 BYOK）
 
-密钥**不会**编译进应用。从 shell 启动时可设环境变量，或在 **设置…** 中粘贴（保存到 `~/Library/Application Support/AFK/` 下权限为 `600` 的文件）。见下方服务商表格。
+密钥**不会**编译进应用。推荐在 **设置…**（⌘,）中粘贴到对应服务商的密钥框并保存（文件权限为 `600`，位于 `~/Library/Application Support/AFK/`）。若从 shell 启动 AFK，环境变量会**覆盖**已保存的文件。
+
+| 服务商 | 环境变量（shell 启动） | 密钥文件 |
+|---|---|---|
+| xAI Grok | `XAI_API_KEY_VOICE`（不是通用的 `XAI_API_KEY`） | `…/AFK/xai-api-key` |
+| OpenRouter | `OPENROUTER_API_KEY` | `…/AFK/openrouter-api-key` |
+| OpenAI | `OPENAI_API_KEY` | `…/AFK/openai-api-key` |
+| Ollama / 本地 Whisper | 无需 | 无 |
+| 自定义 | 无专用环境变量（可选密钥仅在设置 / `custom-api-key`） | `…/AFK/custom-api-key` |
+
+仅 xAI 的辅助命令：`make api-key` 会把 `$XAI_API_KEY_VOICE` 写入 xAI 密钥文件。
+
+### xAI / Grok Voice Transcribe（默认）
+
+1. 打开 [xAI Console](https://console.x.ai/) 并登录（API 计费与消费级 Grok 聊天产品分开）。
+2. 进入 **API Keys** → 创建密钥 → 立即复制（`xai-…`）。
+3. 在 AFK → **设置…** 中为语音转写和/或润色选择 **xAI Grok**，粘贴密钥并保存。或：`export XAI_API_KEY_VOICE=…` 后从该 shell 启动 / 运行 `make api-key`。
+
+文档快速入门：[docs.x.ai](https://docs.x.ai/developers/quickstart)。
+
+### OpenAI
+
+1. 打开 [platform.openai.com](https://platform.openai.com/)（开发者平台 — 不是 chatgpt.com）。
+2. **API keys** → **Create new secret key** → 只显示一次，请立刻复制。
+3. 在 AFK 设置的 **OpenAI** 下粘贴，或设置 `OPENAI_API_KEY`（shell 启动）。
+
+### OpenRouter
+
+1. 在 [openrouter.ai](https://openrouter.ai/) 注册，按需充值。
+2. 在控制台创建 API 密钥（“Get your API key”）。
+3. 在 AFK 设置的 **OpenRouter** 下粘贴，或设置 `OPENROUTER_API_KEY`。
+
+### Ollama（仅本地润色）
+
+无需 API 密钥。安装 [Ollama](https://ollama.com/)，拉取聊天模型（AFK 默认 `qwen2.5:0.5b`），基址保持 `http://localhost:11434/v1`（也可在设置中修改）。语音转写需另选服务商（如本地 Whisper 或云端 STT）。
+
+### 本地 Whisper（whisper.cpp，仅语音转写）
+
+无需 API 密钥。在终端运行：
+
+```bash
+scripts/local-whisper.sh [base|small|large-v3-turbo-q5_0]
+```
+
+必要时会通过 Homebrew 安装 `whisper-cpp`，下载模型，并在 `http://127.0.0.1:8178/v1` 提供 OpenAI 兼容的转写接口。在设置中将语音转写设为 **本地 Whisper**。
+
+### 自定义（OpenAI 兼容）
+
+将基址指向 LM Studio、自建 Whisper 服务等。密钥**可选** — 仅当该服务需要 `Authorization: Bearer …` 时。在设置中粘贴；没有专用环境变量。
+
+### 服务商能力一览
+
+| 服务商 | 语音转写 | 润色 | 需要密钥？ |
+|---|---|---|---|
+| **xAI Grok**（默认） | 流式，实时文字 | ✓ | 是（`XAI_API_KEY_VOICE`） |
+| **OpenRouter** | 一次性（`/audio/transcriptions`） | ✓ 任意聊天模型 | 是 |
+| **OpenAI** | 一次性（如 `gpt-4o-mini-transcribe`） | ✓ | 是 |
+| **Ollama**（本地） | — | ✓ | 否 |
+| **本地 Whisper** | 一次性 | — | 否 |
+| **自定义** | 一次性 | ✓ | 可选 |
+
+使用本地 Whisper + Ollama 时，数据不会离开本机；开始录音时 AFK 会预加载 Ollama 模型。云端服务商会用**你的**密钥把音频（及润色文本）发到对应 API — AFK 不运营代理。
 
 ## 使用
 
@@ -55,17 +143,6 @@ open /Applications/AFK.app
 9. 菜单 → **麦克风**：系统默认或指定输入；选择会持久保存，设备拔出时回退到默认
 10. 菜单 → **历史… (N)**：每条转写含时间、目标应用与长度，最新在前。可搜索、**复制**、**粘贴到上一应用**、**删除**、**全部清除…**。仅保存在本地 `~/Library/Application Support/AFK/history.json`（权限 600）
 11. 菜单 → **设置…**（⌘,）：分别为语音转写与润色选择**服务商与模型**，粘贴 API 密钥（掩码显示），并**测试**两者。密钥缺失或被拒时菜单显示 ⚠️
-
-    | 服务商 | 语音转写 | 润色 | 密钥 |
-    |---|---|---|---|
-    | **xAI Grok**（默认） | 流式，实时文字 | ✓ | `XAI_API_KEY_VOICE` |
-    | **OpenRouter** | 一次性（`/audio/transcriptions`），如 `fish-audio/transcribe-1`、`qwen/qwen3-asr-1.7b` | ✓ 任意聊天模型 | `OPENROUTER_API_KEY` |
-    | **OpenAI** | 一次性，如 `gpt-4o-mini-transcribe` | ✓ | `OPENAI_API_KEY` |
-    | **Ollama**（本地） | — | ✓ `http://localhost:11434/v1` | 无需 |
-    | **本地 Whisper**（whisper.cpp，本地） | 一次性，`http://127.0.0.1:8178/v1` — 运行 `scripts/local-whisper.sh [base\|small\|large-v3-turbo-q5_0]` 下载模型并启动 | — | 无需 |
-    | **自定义** OpenAI 兼容（LM Studio、本地 Whisper 服务等） | 一次性 | ✓ | 可选 |
-
-    从 shell 启动时密钥来自环境变量，否则来自 `~/Library/Application Support/AFK/<provider>-api-key`。使用本地 Whisper + Ollama 时，数据不会离开本机；开始录音时 AFK 会预加载 Ollama 模型。
 12. 菜单 → **复制上次转写** — 若粘贴到了错误位置
 13. 菜单 → **已启用** — 开关监听
 
@@ -78,7 +155,7 @@ open /Applications/AFK.app
 
 ## 贡献
 
-见 [CONTRIBUTING.md](CONTRIBUTING.md)。大规模改动前请阅读 [docs/PLAN.md](docs/PLAN.md) 与 [docs/RELEASE_PLAN.md](docs/RELEASE_PLAN.md)。
+见 [CONTRIBUTING.md](CONTRIBUTING.md)。大规模改动前请阅读 [docs/PLAN.md](docs/PLAN.md)、[docs/RELEASE_PLAN.md](docs/RELEASE_PLAN.md) 与 [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)。
 
 ## 许可证
 
@@ -90,8 +167,12 @@ open /Applications/AFK.app
 Sources/AFKCore/   Hotkey*、KeyMonitor、TalkSettings、AudioDevices、AudioRecorder、GrokStt、TranscriptAssembler、
                    ApiKeyStore、ListeningOverlay、VocabularyWindow、HistoryStore、HistoryWindow、TextInjector、LexiconStore、AppDelegate
 Sources/AFKApp/    main.swift
-docs/PLAN.md       产品计划
-docs/PRIOR_ART.md  复用说明
+docs/PLAN.md           产品计划
+docs/PRIOR_ART.md      复用说明
+docs/BUILD.md          本地构建与签名
+docs/DISTRIBUTION.md   DMG、Gatekeeper、Developer ID、Releases（英文）
+docs/RELEASE_PLAN.md   开源 / App Store / iOS
+scripts/make-dmg.sh    将 AFK.app 打成 dist/AFK-VERSION.dmg
 ```
 
 ## 图标
@@ -105,3 +186,4 @@ Logo 为 `design/logo/afk-logo-dark.svg`（及 `-light`）：两只眼睛上方�
 3. ~~词汇表 + 轻度润色~~
 4. 中英混合评测 vs Fun-ASR
 5. iOS 键盘中继
+6. 经公证的 GitHub Releases DMG（Developer ID）

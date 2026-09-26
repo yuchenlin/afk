@@ -4,7 +4,9 @@
 
 **Away From Keyboard** — hold a shortcut (default **⌘G**, or **Fn**), speak, and text lands at the caret. macOS menu-bar app first.
 
-Hold the shortcut → mic streams to your chosen STT provider (live text in an on-screen pill) → release → text pastes at the caret.
+## What AFK does
+
+Hold the shortcut → your Mac’s mic streams to the speech-to-text provider you chose (live text in an on-screen pill) → release → the transcript pastes at the caret. Optional polish strips fillers without rewriting what you said.
 
 > Screenshots / demo GIF welcome — open a PR if you have a clean capture.
 
@@ -20,17 +22,42 @@ Hold the shortcut → mic streams to your chosen STT provider (live text in an o
 
 See [docs/PRIOR_ART.md](docs/PRIOR_ART.md). Fn + paste adapted from [Scribe](https://github.com/xiangst0816/scribe) (MIT).
 
-## Install (Mac)
+## Download & install (Mac)
+
+### 1. Preferred: GitHub Releases DMG *(coming with the first Release)*
+
+When a notarized build is published, download **`AFK-*.dmg`** from [GitHub Releases](https://github.com/yuchenlin/afk/releases), open the disk image, and drag **AFK.app** into **Applications**.
+
+Until that asset exists, use **build from source** below. Packaging a DMG locally is already supported (`make dmg` → `dist/AFK-VERSION.dmg`); shipping it to strangers still needs Apple **Developer ID** + notarization — see [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
+
+#### Gatekeeper (unsigned / unnotarized / Apple Development builds)
+
+macOS may say AFK “can’t be opened because Apple cannot check it for malicious software.” That is expected until a Developer ID–notarized Release exists. To open anyway:
+
+1. **Right-click** (Control-click) **AFK.app** → **Open** → **Open**, or
+2. **System Settings → Privacy & Security** → find the AFK message → **Open Anyway**, then confirm.
+
+**Honest note:** a frictionless double-click install for other people’s Macs requires an [Apple Developer Program](https://developer.apple.com/programs/) enrollment, a **Developer ID Application** certificate, `notarytool` notarization, and stapling. Signing into Xcode → Settings → Accounts (Apple Development) is **not** the same as creating a Developer ID cert. Apple Development or the local `make dev-cert` identity only helps *your* Mac keep Accessibility/Microphone grants across rebuilds — it does **not** satisfy Gatekeeper elsewhere. Details and a checklist: [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
+
+### 2. Build from source
+
+Needs **full Xcode.app** on macOS (Command Line Tools alone fails on recent Swift toolchains with a cryptic plist parse error).
 
 ```bash
 git clone https://github.com/yuchenlin/afk.git
 cd afk
-make install        # → /Applications/AFK.app (uses Apple Development or `make dev-cert`)
-make api-key        # optional: writes $XAI_API_KEY_VOICE to the key file (or paste it in Settings…)
+make install        # → /Applications/AFK.app (Apple Development or `make dev-cert`)
+make api-key        # optional: writes $XAI_API_KEY_VOICE to the key file (or paste in Settings…)
 open /Applications/AFK.app
 ```
 
-Needs **full Xcode.app** on macOS (Command Line Tools alone fails on recent Swift toolchains with a cryptic plist parse error).
+Optional packaging (same signing as `make build`; not notarized):
+
+```bash
+make dmg            # → dist/AFK-<version>.dmg
+```
+
+More build notes: [docs/BUILD.md](docs/BUILD.md).
 
 ### Permissions
 
@@ -38,9 +65,70 @@ Do this once on a stably-signed build: menu bar ⚠︎ → **Grant Accessibility
 
 `make install` signs with a stable identity (Apple Development if present, else `make dev-cert`) so grants **survive rebuilds**. Ad-hoc signing (`codesign -`) changes the CDHash every build and macOS forgets the grants — `make install` refuses that. After switching from an old ad-hoc install, remove ghost **AFK** rows in Accessibility, then enable the new `/Applications/AFK.app` once.
 
-### API keys (BYOK)
+## API keys tutorial (BYOK)
 
-Keys are never compiled into the app. Set an env var when launching from a shell, or paste in **Settings…** (saved to mode-`600` files under `~/Library/Application Support/AFK/`). See the provider table below.
+Keys are **never** compiled into the app. Prefer **Settings…** (⌘,) → paste into the provider’s key field → Save (files are mode `600` under `~/Library/Application Support/AFK/`). If you launch AFK from a shell, an environment variable **overrides** a saved file for that provider.
+
+| Provider | Env var (shell launches) | Key file |
+|---|---|---|
+| xAI Grok | `XAI_API_KEY_VOICE` (not a generic `XAI_API_KEY`) | `…/AFK/xai-api-key` |
+| OpenRouter | `OPENROUTER_API_KEY` | `…/AFK/openrouter-api-key` |
+| OpenAI | `OPENAI_API_KEY` | `…/AFK/openai-api-key` |
+| Ollama / Local Whisper | none | none |
+| Custom | none (optional key only in Settings / `custom-api-key`) | `…/AFK/custom-api-key` |
+
+Helper for xAI only: `make api-key` writes `$XAI_API_KEY_VOICE` to the xAI key file.
+
+### xAI / Grok Voice Transcribe (default)
+
+1. Open the [xAI Console](https://console.x.ai/) and sign in (API billing is separate from the consumer Grok chat product).
+2. Go to **API Keys** → create a key → copy it immediately (`xai-…`).
+3. In AFK → **Settings…**, choose **xAI Grok** for speech and/or polish, paste the key, Save. Or: `export XAI_API_KEY_VOICE=…` then launch from that shell / `make api-key`.
+
+Docs quickstart: [docs.x.ai](https://docs.x.ai/developers/quickstart).
+
+### OpenAI
+
+1. Open [platform.openai.com](https://platform.openai.com/) (developer platform — not chatgpt.com).
+2. **API keys** → **Create new secret key** → copy once.
+3. Paste in AFK Settings under **OpenAI**, or set `OPENAI_API_KEY` for shell launches.
+
+### OpenRouter
+
+1. Sign up at [openrouter.ai](https://openrouter.ai/), add credits if needed.
+2. Create an API key from the dashboard (“Get your API key”).
+3. Paste in AFK Settings under **OpenRouter**, or set `OPENROUTER_API_KEY`.
+
+### Ollama (local polish only)
+
+No API key. Install [Ollama](https://ollama.com/), pull a chat model (AFK’s default is `qwen2.5:0.5b`), leave the base URL at `http://localhost:11434/v1` (or edit in Settings). Speech must use another provider (e.g. Local Whisper or a cloud STT).
+
+### Local Whisper (whisper.cpp, speech only)
+
+No API key. In a terminal:
+
+```bash
+scripts/local-whisper.sh [base|small|large-v3-turbo-q5_0]
+```
+
+That installs `whisper-cpp` via Homebrew if needed, downloads a model, and serves OpenAI-compatible transcriptions at `http://127.0.0.1:8178/v1`. In Settings, set speech-to-text to **Local Whisper**.
+
+### Custom (OpenAI-compatible)
+
+Point the base URL at LM Studio, a self-hosted Whisper server, etc. A key is **optional** — only if that server requires `Authorization: Bearer …`. Paste in Settings; there is no dedicated env var.
+
+### Provider capabilities
+
+| Provider | Speech-to-text | Polish | Key required? |
+|---|---|---|---|
+| **xAI Grok** (default) | streaming, live text | ✓ | yes (`XAI_API_KEY_VOICE`) |
+| **OpenRouter** | one-shot (`/audio/transcriptions`) | ✓ any chat model | yes |
+| **OpenAI** | one-shot (e.g. `gpt-4o-mini-transcribe`) | ✓ | yes |
+| **Ollama** (local) | — | ✓ | no |
+| **Local Whisper** | one-shot | — | no |
+| **Custom** | one-shot | ✓ | optional |
+
+With Local Whisper + Ollama, nothing leaves the Mac; AFK preloads the Ollama model when recording starts. Cloud providers send audio (and polish text) to that provider’s API using **your** key — AFK does not run a proxy.
 
 ## Use
 
@@ -55,17 +143,6 @@ Keys are never compiled into the app. Set an env var when launching from a shell
 9. Menu → **Microphone**: System Default or a specific input; the choice persists and falls back to the default if that device is unplugged
 10. Menu → **History… (N)**: every transcript with time, target app, and length, newest first. Search, **Copy**, **Paste into Previous App**, **Delete**, and **Clear All…**. Saved locally in `~/Library/Application Support/AFK/history.json` (mode 600)
 11. Menu → **Settings…** (⌘,): choose a **provider and model** separately for speech-to-text and polish, paste API keys (masked), and **Test** both. The menu shows ⚠️ when a key is missing or rejected
-
-    | Provider | Speech-to-text | Polish | Key |
-    |---|---|---|---|
-    | **xAI Grok** (default) | streaming, live text | ✓ | `XAI_API_KEY_VOICE` |
-    | **OpenRouter** | one-shot (`/audio/transcriptions`), e.g. `fish-audio/transcribe-1`, `qwen/qwen3-asr-1.7b` | ✓ any chat model | `OPENROUTER_API_KEY` |
-    | **OpenAI** | one-shot, e.g. `gpt-4o-mini-transcribe` | ✓ | `OPENAI_API_KEY` |
-    | **Ollama** (local) | — | ✓ `http://localhost:11434/v1` | none |
-    | **Local Whisper** (whisper.cpp, local) | one-shot, `http://127.0.0.1:8178/v1` — run `scripts/local-whisper.sh [base\|small\|large-v3-turbo-q5_0]` to download a model and start it | — | none |
-    | **Custom** OpenAI-compatible (LM Studio, local Whisper server, …) | one-shot | ✓ | optional |
-
-    Keys come from the environment when AFK is launched from a shell, otherwise from `~/Library/Application Support/AFK/<provider>-api-key`. With Local Whisper + Ollama, nothing leaves the Mac; AFK preloads the Ollama model when recording starts.
 12. Menu → **Copy Last Transcript** if a paste went to the wrong place
 13. Menu → **Enabled** toggles the listener
 
@@ -78,7 +155,7 @@ Keys are never compiled into the app. Set an env var when launching from a shell
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Please read [docs/PLAN.md](docs/PLAN.md) and [docs/RELEASE_PLAN.md](docs/RELEASE_PLAN.md) before large changes.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Please read [docs/PLAN.md](docs/PLAN.md), [docs/RELEASE_PLAN.md](docs/RELEASE_PLAN.md), and [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) before large changes.
 
 ## License
 
@@ -90,8 +167,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Please read [docs/PLAN.md](docs/PLAN.md)
 Sources/AFKCore/   Hotkey*, KeyMonitor, TalkSettings, AudioDevices, AudioRecorder, GrokStt, TranscriptAssembler,
                    ApiKeyStore, ListeningOverlay, VocabularyWindow, HistoryStore, HistoryWindow, TextInjector, LexiconStore, AppDelegate
 Sources/AFKApp/    main.swift
-docs/PLAN.md       product plan
-docs/PRIOR_ART.md  reuse notes
+docs/PLAN.md           product plan
+docs/PRIOR_ART.md      reuse notes
+docs/BUILD.md          local build & signing
+docs/DISTRIBUTION.md   DMG, Gatekeeper, Developer ID, Releases
+docs/RELEASE_PLAN.md   open source / App Store / iOS
+scripts/make-dmg.sh    package AFK.app into dist/AFK-VERSION.dmg
 ```
 
 ## Icon
@@ -105,3 +186,4 @@ The logo is `design/logo/afk-logo-dark.svg` (and `-light`): two eyes above a sou
 3. ~~Lexicon + light polish~~
 4. zh–en mix eval vs Fun-ASR
 5. iOS keyboard relay
+6. Notarized GitHub Releases DMG (Developer ID)

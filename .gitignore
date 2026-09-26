@@ -24,3 +24,7 @@ eval/recordings/
 *.pcm
 # Build output
 /AFK.app/
+
+# Release packaging
+/dist/
+*.dmg

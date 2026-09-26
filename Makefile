@@ -14,7 +14,7 @@ CODESIGN_IDENTITY ?= $(shell \
 		test -n "$$id" && echo "$$id" || echo -; \
 	else echo -; fi)
 
-.PHONY: build clean run install dev-cert api-key icons check-sign
+.PHONY: build clean run install dmg dev-cert api-key icons check-sign
 
 check-sign:
 	@id="$(CODESIGN_IDENTITY)"; \
@@ -67,6 +67,11 @@ install: check-sign build
 	@echo "✅ Installed /Applications/$(APP_BUNDLE)"
 	@echo "   If this is the first stable-signed install, grant Accessibility + Microphone once in"
 	@echo "   System Settings → Privacy & Security (remove any old ad-hoc 'AFK' ghosts first)."
+
+# Package AFK.app into dist/AFK-VERSION.dmg (drag-to-Applications).
+# Uses the signature from `make build`. Not notarized — see docs/DISTRIBUTION.md.
+dmg: build
+	./scripts/make-dmg.sh
 
 dev-cert:
 	./scripts/make-dev-cert.sh "$(DEV_CERT)"
