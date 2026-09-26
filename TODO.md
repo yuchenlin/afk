@@ -4,18 +4,18 @@ Follow-ups from the release plan. Background, reasoning and sources: [docs/RELEA
 
 ## Decisions
 
-- [ ] License: MIT (simplest, matches Scribe) or GPL-3.0 (copies must stay open)
+- [x] License: **MIT** (matches Scribe; flip to GPL only if you knowingly want copyleft)
 - [ ] Store name ("AFK" alone is likely taken)
 - [ ] Business model: bring-your-own-key only, or hosted transcription (subscription via In-App Purchase + proxy backend)
 - [ ] Enroll in the Apple Developer Program ($99/year; needed for notarization, TestFlight, both stores)
 
 ## 1. Open source
 
-- [ ] Add `LICENSE`
-- [ ] Add `THIRD_PARTY_NOTICES.md` with Scribe's MIT copyright notice (KeyMonitor / TextInjector are adapted from it)
-- [ ] Rewrite README for new users: what it is, screenshot/GIF, install, providers, privacy (what leaves the Mac, to whom)
-- [ ] GitHub Actions: `swift build` + `swift test` on macOS (live-API tests skip without keys)
-- [ ] `CONTRIBUTING.md` and issue templates
+- [x] Add `LICENSE`
+- [x] Add `THIRD_PARTY_NOTICES.md` with Scribe's MIT copyright notice (KeyMonitor / TextInjector are adapted from it)
+- [x] Rewrite README for new users: what it is, install, providers, privacy (screenshot/GIF still welcome)
+- [x] GitHub Actions: `swift build` + `swift test` on macOS (live-API tests skip without keys)
+- [x] `CONTRIBUTING.md` and issue templates
 - [ ] Decide whether to keep `design/logo/candidates/` in the repo
 - [ ] Make the repo public (history already checked: no keys, single author)
 

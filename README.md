@@ -4,6 +4,8 @@
 
 v0.2: hold the shortcut → mic streams to **Grok Voice Transcribe 2.0** (live text in an on-screen pill) → release → text pastes at the caret.
 
+> Screenshots / demo GIF welcome — open a PR if you have a clean capture.
+
 ## Prior art
 
 See [docs/PRIOR_ART.md](docs/PRIOR_ART.md). Fn + paste adapted from [Scribe](https://github.com/xiangst0816/scribe) (MIT).
@@ -18,7 +20,7 @@ make api-key        # optional: writes $XAI_API_KEY_VOICE to the key file (or pa
 open /Applications/AFK.app
 ```
 
-Needs **full Xcode.app** (CLT alone fails on Swift 6.4 with a cryptic plist parse error). PiggyHouse is the intended build machine.
+Needs **full Xcode.app** on macOS (Command Line Tools alone fails on recent Swift toolchains with a cryptic plist parse error).
 
 **Permissions (do this once on a stably-signed build):** menu bar ⚠︎ → **Grant Accessibility…** / **Grant Microphone…**, or System Settings → Privacy & Security → enable **AFK** under Accessibility and Microphone. `make install` signs with a stable identity (Apple Development if present, else `make dev-cert`) so grants **survive rebuilds**. Ad-hoc signing (`codesign -`) changes the CDHash every build and macOS forgets the grants — `make install` refuses that. After switching from an old ad-hoc install, remove ghost **AFK** rows in Accessibility, then enable the new `/Applications/AFK.app` once.
 
@@ -50,6 +52,17 @@ The API key is `XAI_API_KEY_VOICE`, read from the environment or `~/Library/Appl
     Keys come from the environment variable when AFK is launched from a shell, otherwise from `~/Library/Application Support/AFK/<provider>-api-key`. Test reports incorrect keys, missing access, OpenRouter privacy-policy blocks, unknown models, and local servers that aren't running. OpenAI (direct) is implemented but untested here. Whisper output is cleaned (non-speech tags like `[BLANK_AUDIO]` dropped, Traditional Chinese converted to Simplified). With Local Whisper + Ollama, nothing leaves the Mac; AFK preloads the Ollama model when recording starts.
 12. Menu → **Copy Last Transcript** if a paste went to the wrong place
 13. Menu → **Enabled** toggles the listener
+
+## Privacy
+
+- **Local-only path:** Local Whisper (speech) + Ollama (polish) — audio and text stay on your Mac.
+- **Cloud providers:** when you choose xAI, OpenRouter, or OpenAI, audio (and polish text) is sent to that provider’s API. AFK does not operate a proxy; you bring your own key.
+- **Keys:** never compiled into the binary. Read from the environment or from mode-`600` files under `~/Library/Application Support/AFK/` (or paste in **Settings…**). Production App Store builds should use Keychain + a consent screen (see [docs/RELEASE_PLAN.md](docs/RELEASE_PLAN.md)).
+- **History / vocabulary:** stored only on disk under Application Support; not uploaded by AFK.
+
+## License
+
+[MIT](LICENSE). `KeyMonitor` / `TextInjector` adapt [Scribe](https://github.com/xiangst0816/scribe) (MIT) — see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Layout
 

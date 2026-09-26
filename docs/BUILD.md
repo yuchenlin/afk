@@ -2,18 +2,17 @@
 
 ## Requirement
 
-Full **Xcode.app** on the Mac. Command Line Tools alone (as on Yuchen's Air, 2026-09-25) make `swift build` die with:
+Full **Xcode.app** on the Mac. Command Line Tools alone make `swift build` die with:
 
 `Unknown error parsing property list` / `Could not initialize build system`
 
-## On PiggyHouse
+## Quick build
 
 ```bash
-cd ~/Documents/GitHub
-gh repo clone yuchenlin/afk   # or git pull
+git clone https://github.com/yuchenlin/afk.git
 cd afk
-make build
-open AFK.app
+make build          # or: make install → /Applications/AFK.app
+open AFK.app        # after make build; after make install use /Applications/AFK.app
 ```
 
 Then: System Settings → Privacy & Security → **Accessibility** → enable AFK.
