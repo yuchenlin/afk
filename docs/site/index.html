@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AFK — Away From Keyboard</title>
+  <meta name="description" content="Hold a shortcut, speak, and text lands at the caret. macOS menu-bar speech-to-text with BYOK providers. Open source MIT." />
+  <link rel="canonical" href="https://yuchenlin.github.io/afk/" />
+  <link rel="alternate" hreflang="en" href="https://yuchenlin.github.io/afk/" />
+  <link rel="alternate" hreflang="zh-CN" href="https://yuchenlin.github.io/afk/zh.html" />
+  <meta property="og:title" content="AFK — Away From Keyboard" />
+  <meta property="og:description" content="Hold a shortcut, speak, paste at the caret. BYOK, privacy-friendly, MIT." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://yuchenlin.github.io/afk/" />
+  <meta property="og:image" content="https://yuchenlin.github.io/afk/assets/og-image.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="AFK — Away From Keyboard" />
+  <meta name="twitter:description" content="Hold a shortcut, speak, paste at the caret. BYOK, privacy-friendly, MIT." />
+  <meta name="twitter:image" content="https://yuchenlin.github.io/afk/assets/og-image.jpg" />
+  <link rel="icon" type="image/png" href="assets/app-icon-256.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="nav" aria-label="Primary">
+      <a class="nav-brand" href="index.html">
+        <img src="assets/afk-logo-dark.svg" alt="" width="28" height="28" />
+        AFK
+      </a>
+      <div class="nav-links">
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#download">Download</a>
+        <a href="https://github.com/yuchenlin/afk">GitHub</a>
+        <span class="lang" aria-label="Language">
+          <a class="active" href="index.html" hreflang="en">EN</a>
+          <a href="zh.html" hreflang="zh-CN">中文</a>
+        </span>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <img class="hero-logo" src="assets/afk-logo-dark.svg" alt="AFK logo" width="88" height="88" />
+      <h1>AFK</h1>
+      <p class="tagline">Away From Keyboard</p>
+      <p class="lede">Hold a shortcut (default <span class="kbd">⌘G</span>, or <span class="kbd">Fn</span>), speak, and the transcript pastes at the caret. A quiet macOS menu-bar app — bring your own keys.</p>
+      <div class="cta" id="download">
+        <a class="btn btn-primary" href="https://github.com/yuchenlin/afk/releases/download/v0.1.0/AFK-0.1.0.dmg">Download AFK-0.1.0.dmg</a>
+        <a class="btn btn-ghost" href="https://github.com/yuchenlin/afk">View on GitHub</a>
+      </div>
+      <figure class="hero-visual">
+        <img src="assets/screenshot-listening.png" alt="AFK listening pill over a dark desktop" width="960" height="420" />
+      </figure>
+      <p class="pill-caption">Live transcript pill while you hold the shortcut — release to paste.</p>
+      <!-- Demo video/GIF: not captured yet (agent host lacks Accessibility for menu clicks). Prefer a short screen recording in a follow-up PR. -->
+      <p class="demo-note">Demo video coming soon — stills below until then.</p>
+    </header>
+
+    <section id="how">
+      <h2>How it works</h2>
+      <div class="steps">
+        <div class="step">
+          <span class="n">1</span>
+          <h3>Hold</h3>
+          <p>Press and hold <span class="kbd">⌘G</span> or <span class="kbd">Fn</span> (configurable). The menu-bar icon lights up and the listening pill appears.</p>
+        </div>
+        <div class="step">
+          <span class="n">2</span>
+          <h3>Speak</h3>
+          <p>Your mic streams to the speech-to-text provider you chose. Live text shows in the pill when the provider supports streaming.</p>
+        </div>
+        <div class="step">
+          <span class="n">3</span>
+          <h3>Paste</h3>
+          <p>Release — the transcript pastes at the caret. Optional polish strips fillers without rewriting what you said.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="features">
+      <h2>Features</h2>
+      <div class="features">
+        <div class="feature">
+          <h3>Bring your own keys</h3>
+          <p>xAI Grok, OpenRouter, OpenAI, Local Whisper, Ollama, or a custom OpenAI-compatible server. Keys stay on your Mac.</p>
+        </div>
+        <div class="feature">
+          <h3>Privacy paths</h3>
+          <p>Fully local with Whisper + Ollama, or your own cloud keys. Nothing is bundled into the app binary.</p>
+        </div>
+        <div class="feature">
+          <h3>Menu bar native</h3>
+          <p>Lives quietly in the menu bar. Hold-to-talk or hands-free. Vocabulary, history, and shortcuts when you need them.</p>
+        </div>
+        <div class="feature">
+          <h3>Open source MIT</h3>
+          <p>Read the code, build from source, or grab a notarized DMG. Contributions welcome.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="screenshots">
+      <h2>Screenshots</h2>
+      <div class="shots">
+        <figure class="shot">
+          <img src="assets/screenshot-settings.png" alt="AFK Settings window with speech, polish, and API keys" width="640" height="620" />
+          <figcaption>Settings — providers, models, and API keys (saved only on this Mac).</figcaption>
+        </figure>
+        <figure class="shot">
+          <div class="menubar-frame">
+            <img src="assets/screenshot-menubar@2x.png" alt="macOS menu bar showing the AFK status icon" width="840" height="88" />
+          </div>
+          <figcaption>Menu bar — AFK’s mark sits with your other status items.</figcaption>
+        </figure>
+        <figure class="shot shot-wide">
+          <img src="assets/screenshot-listening-pill.png" alt="AFK listening pill close-up" width="560" height="96" style="margin:1.5rem auto;width:min(100%,560px);background:transparent;" />
+          <figcaption>The listening pill — waveform, live text, elapsed time.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="api-keys">
+      <h2>Get an API key</h2>
+      <div class="note-box">
+        <p><strong>BYOK</strong> — paste a key in Settings (⌘,), or set an env var when you launch from a shell. Start with <a href="https://console.x.ai/">xAI Console</a> for the default Grok voice model, or use OpenAI / OpenRouter / local Whisper.</p>
+        <p style="margin-top:0.75rem">Step-by-step for each provider: <a href="https://github.com/yuchenlin/afk#api-keys-tutorial-byok">README → API keys tutorial</a>.</p>
+      </div>
+    </section>
+
+    <section id="permissions">
+      <h2>Permissions</h2>
+      <div class="note-box">
+        <p>Once, on a stably signed build:</p>
+        <ul>
+          <li><strong>Microphone</strong> — so AFK can hear you</li>
+          <li><strong>Accessibility</strong> — so paste lands at the caret</li>
+        </ul>
+        <p style="margin-top:0.75rem">Grant from the menu bar warning items, or System Settings → Privacy &amp; Security. The Release DMG is Developer ID signed and notarized.</p>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div>AFK · MIT License · <a href="https://github.com/yuchenlin/afk">yuchenlin/afk</a></div>
+      <div>
+        <a href="zh.html">中文</a> ·
+        <a href="https://github.com/yuchenlin/afk/releases">Releases</a> ·
+        <a href="https://github.com/yuchenlin/afk/blob/main/LICENSE">License</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

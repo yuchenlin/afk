@@ -2,13 +2,21 @@
 
 **English** | [中文](README.zh-CN.md)
 
+[![Website](https://img.shields.io/badge/website-yuchenlin.github.io%2Fafk-111827?style=flat-square)](https://yuchenlin.github.io/afk/)
+
+**[Landing page →](https://yuchenlin.github.io/afk/)**
+
 **Away From Keyboard** — hold a shortcut (default **⌘G**, or **Fn**), speak, and text lands at the caret. macOS menu-bar app first.
 
 ## What AFK does
 
 Hold the shortcut → your Mac’s mic streams to the speech-to-text provider you chose (live text in an on-screen pill) → release → the transcript pastes at the caret. Optional polish strips fillers without rewriting what you said.
 
-> Screenshots / demo GIF welcome — open a PR if you have a clean capture.
+<p align="center">
+  <img src="docs/site/assets/screenshot-listening.png" alt="AFK listening pill" width="720" />
+</p>
+
+> More screenshots on the [landing page](https://yuchenlin.github.io/afk/). Demo GIF welcome — open a PR if you have a clean capture.
 
 ## Features
 

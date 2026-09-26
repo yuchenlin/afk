@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AFK — 暂时离开键盘</title>
+  <meta name="description" content="按住快捷键，说话，文字粘贴到光标处。macOS 菜单栏语音转写，自带密钥（BYOK）。开源 MIT。" />
+  <link rel="canonical" href="https://yuchenlin.github.io/afk/zh.html" />
+  <link rel="alternate" hreflang="en" href="https://yuchenlin.github.io/afk/" />
+  <link rel="alternate" hreflang="zh-CN" href="https://yuchenlin.github.io/afk/zh.html" />
+  <meta property="og:title" content="AFK — 暂时离开键盘" />
+  <meta property="og:description" content="按住快捷键，说话，粘贴到光标处。自带密钥、注重隐私、MIT 开源。" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://yuchenlin.github.io/afk/zh.html" />
+  <meta property="og:image" content="https://yuchenlin.github.io/afk/assets/og-image.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" type="image/png" href="assets/app-icon-256.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="nav" aria-label="主导航">
+      <a class="nav-brand" href="zh.html">
+        <img src="assets/afk-logo-dark.svg" alt="" width="28" height="28" />
+        AFK
+      </a>
+      <div class="nav-links">
+        <a href="#how">怎么用</a>
+        <a href="#features">功能</a>
+        <a href="#download">下载</a>
+        <a href="https://github.com/yuchenlin/afk">GitHub</a>
+        <span class="lang" aria-label="语言">
+          <a href="index.html" hreflang="en">EN</a>
+          <a class="active" href="zh.html" hreflang="zh-CN">中文</a>
+        </span>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <img class="hero-logo" src="assets/afk-logo-dark.svg" alt="AFK 标志" width="88" height="88" />
+      <h1>AFK</h1>
+      <p class="tagline">Away From Keyboard（暂时离开键盘）</p>
+      <p class="lede">按住快捷键（默认 <span class="kbd">⌘G</span>，也可选 <span class="kbd">Fn</span>），说话，转写就会粘贴到光标处。安静的 macOS 菜单栏应用 — 自带密钥（BYOK）。</p>
+      <div class="cta" id="download">
+        <a class="btn btn-primary" href="https://github.com/yuchenlin/afk/releases/download/v0.1.0/AFK-0.1.0.dmg">下载 AFK-0.1.0.dmg</a>
+        <a class="btn btn-ghost" href="https://github.com/yuchenlin/afk">在 GitHub 查看</a>
+      </div>
+      <figure class="hero-visual">
+        <img src="assets/screenshot-listening.png" alt="深色桌面上的 AFK 聆听胶囊" width="960" height="420" />
+      </figure>
+      <p class="pill-caption">按住快捷键时显示实时转写胶囊 — 松开即可粘贴。</p>
+      <!-- 演示视频/GIF：尚未录制（代理宿主缺少辅助功能权限，无法点击菜单）。欢迎后续 PR 补上短录屏。 -->
+      <p class="demo-note">演示视频即将推出 — 目前先用下方静态截图。</p>
+    </header>
+
+    <section id="how">
+      <h2>怎么用</h2>
+      <div class="steps">
+        <div class="step">
+          <span class="n">1</span>
+          <h3>按住</h3>
+          <p>按住 <span class="kbd">⌘G</span> 或 <span class="kbd">Fn</span>（可配置）。菜单栏图标点亮，聆听胶囊出现。</p>
+        </div>
+        <div class="step">
+          <span class="n">2</span>
+          <h3>说话</h3>
+          <p>麦克风音频流式发送到你选择的语音转写服务。支持流式的服务商会在胶囊里显示实时文字。</p>
+        </div>
+        <div class="step">
+          <span class="n">3</span>
+          <h3>粘贴</h3>
+          <p>松开 — 转写粘贴到光标处。可选润色会去掉语气词等，但不改写你说的内容。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="features">
+      <h2>功能特点</h2>
+      <div class="features">
+        <div class="feature">
+          <h3>自带密钥（BYOK）</h3>
+          <p>xAI Grok、OpenRouter、OpenAI、本地 Whisper、Ollama，或自定义 OpenAI 兼容服务。密钥只留在你的 Mac 上。</p>
+        </div>
+        <div class="feature">
+          <h3>隐私路径</h3>
+          <p>可用 Whisper + Ollama 完全本地，或使用你自己的云端密钥。密钥不会编译进应用。</p>
+        </div>
+        <div class="feature">
+          <h3>原生菜单栏</h3>
+          <p>安静地待在菜单栏。按住说话或免提模式。需要时还有词汇表、历史记录与快捷键设置。</p>
+        </div>
+        <div class="feature">
+          <h3>开源 MIT</h3>
+          <p>阅读源码、自行构建，或下载已公证的 DMG。欢迎贡献。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="screenshots">
+      <h2>截图</h2>
+      <div class="shots">
+        <figure class="shot">
+          <img src="assets/screenshot-settings.png" alt="AFK 设置窗口：语音、润色与 API 密钥" width="640" height="620" />
+          <figcaption>设置 — 服务商、模型与 API 密钥（仅保存在本机）。</figcaption>
+        </figure>
+        <figure class="shot">
+          <div class="menubar-frame">
+            <img src="assets/screenshot-menubar@2x.png" alt="菜单栏中的 AFK 状态图标" width="840" height="88" />
+          </div>
+          <figcaption>菜单栏 — AFK 标志与其他状态图标并列。</figcaption>
+        </figure>
+        <figure class="shot shot-wide">
+          <img src="assets/screenshot-listening-pill.png" alt="AFK 聆听胶囊特写" width="560" height="96" style="margin:1.5rem auto;width:min(100%,560px);background:transparent;" />
+          <figcaption>聆听胶囊 — 波形、实时文字、已用时间。</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="api-keys">
+      <h2>获取 API 密钥</h2>
+      <div class="note-box">
+        <p><strong>自带密钥（BYOK）</strong> — 在设置（⌘,）中粘贴密钥，或从 shell 启动时设置环境变量。默认可用 <a href="https://console.x.ai/">xAI Console</a> 的 Grok 语音模型，也可选 OpenAI / OpenRouter / 本地 Whisper。</p>
+        <p style="margin-top:0.75rem">各服务商步骤见：<a href="https://github.com/yuchenlin/afk/blob/main/README.zh-CN.md#api-%E5%AF%86%E9%92%A5%E6%95%99%E7%A8%8B%E8%87%AA%E5%B8%A6%E5%AF%86%E9%92%A5-byok">中文 README → API 密钥教程</a>。</p>
+      </div>
+    </section>
+
+    <section id="permissions">
+      <h2>权限</h2>
+      <div class="note-box">
+        <p>请在签名稳定的构建上做一次：</p>
+        <ul>
+          <li><strong>麦克风</strong> — 以便 AFK 听到你说话</li>
+          <li><strong>辅助功能</strong> — 以便粘贴到光标处</li>
+        </ul>
+        <p style="margin-top:0.75rem">可从菜单栏提示项授予，或到「系统设置 → 隐私与安全性」。Release DMG 已使用 Developer ID 签名并经 Apple 公证。</p>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div>AFK · MIT 许可证 · <a href="https://github.com/yuchenlin/afk">yuchenlin/afk</a></div>
+      <div>
+        <a href="index.html">English</a> ·
+        <a href="https://github.com/yuchenlin/afk/releases">Releases</a> ·
+        <a href="https://github.com/yuchenlin/afk/blob/main/LICENSE">License</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

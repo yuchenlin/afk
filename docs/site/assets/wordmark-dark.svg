@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 96" width="360" height="96" role="img" aria-label="AFK">
+  <!-- mark: eyes + waveform, white for dark backgrounds -->
+  <g fill="#FFFFFF" transform="translate(8,8) scale(0.078125)">
+    <circle cx="402" cy="380" r="48"/>
+    <circle cx="622" cy="380" r="48"/>
+    <rect x="305" y="578.3" width="54" height="70" rx="27"/>
+    <rect x="395" y="600.8" width="54" height="110" rx="27"/>
+    <rect x="485" y="605.0" width="54" height="130" rx="27"/>
+    <rect x="575" y="600.8" width="54" height="110" rx="27"/>
+    <rect x="665" y="578.3" width="54" height="70" rx="27"/>
+  </g>
+  <text x="100" y="64" font-family="SF Pro Display, -apple-system, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="52" font-weight="700" letter-spacing="0.04em" fill="#FFFFFF">AFK</text>
+</svg>

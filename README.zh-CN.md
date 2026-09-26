@@ -2,13 +2,21 @@
 
 [English](README.md) | **中文**
 
+[![Website](https://img.shields.io/badge/website-yuchenlin.github.io%2Fafk-111827?style=flat-square)](https://yuchenlin.github.io/afk/zh.html)
+
+**[产品主页 →](https://yuchenlin.github.io/afk/zh.html)**
+
 **Away From Keyboard（暂时离开键盘）** — 按住快捷键（默认 **⌘G**，也可选 **Fn**），说话，文字就会出现在光标处。优先支持 macOS 菜单栏应用。
 
 ## AFK 是做什么的
 
 按住快捷键 → 麦克风音频流式发送到你选择的语音转写（STT）服务（屏幕上的胶囊实时显示文字）→ 松开 → 转写粘贴到光标位置。可选润色会去掉语气词等，但不改写你说的内容。
 
-> 欢迎贡献截图 / 演示 GIF — 有干净素材欢迎提 PR。
+<p align="center">
+  <img src="docs/site/assets/screenshot-listening.png" alt="AFK 聆听胶囊" width="720" />
+</p>
+
+> 更多截图见[产品主页](https://yuchenlin.github.io/afk/zh.html)。欢迎贡献演示 GIF — 有干净素材欢迎提 PR。
 
 ## 功能特点
 
