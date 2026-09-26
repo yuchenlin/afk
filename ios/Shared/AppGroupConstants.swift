@@ -20,6 +20,7 @@ public enum AppGroupConstants {
     public static let sessionActiveKey = "session.active"
     public static let sessionExpiresAtKey = "session.expiresAt"
     public static let recordingActiveKey = "recording.active"
+    public static let recordingLevelKey = "recording.level"
     public static let lastResultTextKey = "result.text"
     public static let lastResultIDKey = "result.id"
     public static let lastErrorKey = "result.error"
@@ -29,6 +30,13 @@ public enum AppGroupConstants {
     public static let settingsSessionMinutesKey = "settings.sessionMinutes"
     public static let settingsUseMockSTTKey = "settings.useMockSTT"
     public static let settingsPolishEnabledKey = "settings.polishEnabled"
+
+    /// Keyboard → host command channel (survives missed Darwin notifies).
+    /// Values: "" | "start" | "stop"
+    public static let commandActionKey = "command.action"
+    public static let commandIDKey = "command.id"
+    public static let commandAtKey = "command.at"
+    public static let lastConsumedCommandIDKey = "command.lastConsumedID"
 
     // Full Access handshake (host writes challenge; keyboard with Full Access echoes)
     public static let fullAccessHostChallengeKey = "fullAccess.hostChallenge"

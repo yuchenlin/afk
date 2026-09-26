@@ -7,59 +7,304 @@ protocol KeyboardViewDelegate: AnyObject {
     func keyboardSpace()
     func keyboardNextKeyboard()
     func keyboardToggleShift()
+    /// Hold-to-talk / release-to-send (primary).
+    func keyboardMicHoldBegan()
+    func keyboardMicHoldEnded()
+    /// Clear tap start/stop when not using hold.
     func keyboardMicTapped()
+    func keyboardSwitchToVoice()
+    func keyboardSwitchToTypingEN()
+    func keyboardSwitchToTypingCN()
 }
 
-/// Minimal QWERTY + globe + mic — Guideline 4.4.1 requires real typing, not mic-only.
+enum KeyboardSurfaceMode {
+    case voice
+    case typingEN
+    case typingCN
+}
+
+/// Typeless-like keyboard: voice/transcription is primary; EN / 中文 typing only after switch.
+/// Guideline 4.4.1: typing layouts + globe + Full Access messaging remain available.
 final class KeyboardView: UIView {
     weak var delegate: KeyboardViewDelegate?
 
-    private let titleLabel = UILabel()
-    private let statusLabel = UILabel()
-    private let stack = UIStackView()
-    private var shiftButton: UIButton?
-    private var micButton: UIButton?
+    private(set) var mode: KeyboardSurfaceMode = .voice
 
-    private let rows: [[String]] = [
-        Array("qwertyuiop").map(String.init),
-        Array("asdfghjkl").map(String.init),
-        ["⇧"] + Array("zxcvbnm").map(String.init) + ["⌫"],
-        ["🌐", "🎤", "space", "return"],
-    ]
+    private let root = UIStackView()
+    private let statusLabel = UILabel()
+    private let previewLabel = UILabel()
+    private let contentHost = UIView()
+
+    // Voice chrome
+    private let voiceStack = UIStackView()
+    private let micButton = UIButton(type: .custom)
+    private let waveform = WaveformView()
+    private let holdHint = UILabel()
+    private let voiceToolbar = UIStackView()
+
+    // Typing chrome
+    private let typingStack = UIStackView()
+    private let candidateScroll = UIScrollView()
+    private let candidateRow = UIStackView()
+    private let keysStack = UIStackView()
+    private var shiftButton: UIButton?
+    private var shiftOn = false
+
+    // Shared bottom bar pieces rebuilt per mode
+    private var pinyinBuffer = ""
+    private var candidates: [String] = []
+
+    private var isHoldingMic = false
+    private var holdDidFire = false
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = UIColor.systemGray5
+        backgroundColor = UIColor.systemGray6
+        buildChrome()
+        applyMode(.voice, animated: false)
+    }
 
-        titleLabel.text = "AFK Keyboard"
-        titleLabel.font = .systemFont(ofSize: 11, weight: .semibold)
-        titleLabel.textAlignment = .center
-        titleLabel.textColor = .secondaryLabel
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-        statusLabel.font = .systemFont(ofSize: 10)
-        statusLabel.textAlignment = .center
-        statusLabel.textColor = .orange
-        statusLabel.numberOfLines = 2
+    func setMode(_ mode: KeyboardSurfaceMode) {
+        guard mode != self.mode else { return }
+        applyMode(mode, animated: true)
+    }
 
-        stack.axis = .vertical
-        stack.spacing = 6
-        stack.distribution = .fillEqually
+    func setShift(_ on: Bool) {
+        shiftOn = on
+        shiftButton?.backgroundColor = on ? .systemBlue : .systemGray4
+        shiftButton?.setTitleColor(on ? .white : .label, for: .normal)
+    }
 
-        let header = UIStackView(arrangedSubviews: [titleLabel, statusLabel])
-        header.axis = .vertical
-        header.spacing = 2
+    func setStatus(
+        sessionOn: Bool,
+        recording: Bool,
+        needsFullAccess: Bool,
+        level: Float,
+        hostStatus: String
+    ) {
+        waveform.level = recording ? level : 0
+        waveform.isHidden = !recording || mode != .voice
 
-        let root = UIStackView(arrangedSubviews: [header, stack])
+        if needsFullAccess {
+            statusLabel.text = "Full Access off · typing OK · dictation needs AFK app + Full Access"
+            statusLabel.textColor = .systemOrange
+            styleMic(ready: false, recording: false)
+            holdHint.text = "Enable Full Access for dictation"
+        } else if recording {
+            statusLabel.text = hostStatus.isEmpty ? "Listening… release to send" : hostStatus
+            statusLabel.textColor = .systemRed
+            styleMic(ready: true, recording: true)
+            holdHint.text = "Release to send"
+        } else if sessionOn {
+            statusLabel.text = hostStatus.isEmpty ? "Session on · hold mic to talk" : hostStatus
+            statusLabel.textColor = .secondaryLabel
+            styleMic(ready: true, recording: false)
+            holdHint.text = "Hold to talk · tap to toggle"
+        } else {
+            statusLabel.text = "No session · open AFK → Start dictation session"
+            statusLabel.textColor = .systemOrange
+            styleMic(ready: false, recording: false)
+            holdHint.text = "Start a session in the AFK app first"
+        }
+    }
+
+    func setPreview(_ text: String?) {
+        if let text, !text.isEmpty {
+            previewLabel.text = text
+            previewLabel.isHidden = false
+        } else {
+            previewLabel.text = nil
+            previewLabel.isHidden = true
+        }
+    }
+
+    func flash(_ message: String) {
+        let previous = statusLabel.text
+        let previousColor = statusLabel.textColor
+        statusLabel.text = message
+        statusLabel.textColor = .label
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in
+            guard let self, self.statusLabel.text == message else { return }
+            self.statusLabel.text = previous
+            self.statusLabel.textColor = previousColor
+        }
+    }
+
+    // MARK: - Build
+
+    private func buildChrome() {
         root.axis = .vertical
         root.spacing = 6
         root.translatesAutoresizingMaskIntoConstraints = false
         addSubview(root)
         NSLayoutConstraint.activate([
-            root.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
-            root.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
-            root.topAnchor.constraint(equalTo: topAnchor, constant: 4),
-            root.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
+            root.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+            root.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+            root.topAnchor.constraint(equalTo: topAnchor, constant: 6),
+            root.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -6),
         ])
+
+        statusLabel.font = .systemFont(ofSize: 11, weight: .semibold)
+        statusLabel.textAlignment = .center
+        statusLabel.numberOfLines = 2
+        statusLabel.textColor = .secondaryLabel
+
+        previewLabel.font = .systemFont(ofSize: 15, weight: .medium)
+        previewLabel.textAlignment = .center
+        previewLabel.numberOfLines = 2
+        previewLabel.textColor = .label
+        previewLabel.isHidden = true
+
+        contentHost.translatesAutoresizingMaskIntoConstraints = false
+        contentHost.setContentHuggingPriority(.defaultLow, for: .vertical)
+
+        root.addArrangedSubview(statusLabel)
+        root.addArrangedSubview(previewLabel)
+        root.addArrangedSubview(contentHost)
+        contentHost.heightAnchor.constraint(greaterThanOrEqualToConstant: 200).isActive = true
+
+        buildVoiceSurface()
+        buildTypingSurface()
+    }
+
+    private func buildVoiceSurface() {
+        voiceStack.axis = .vertical
+        voiceStack.alignment = .center
+        voiceStack.spacing = 10
+        voiceStack.translatesAutoresizingMaskIntoConstraints = false
+
+        micButton.translatesAutoresizingMaskIntoConstraints = false
+        micButton.layer.cornerRadius = 48
+        micButton.clipsToBounds = true
+        let micConfig = UIImage.SymbolConfiguration(pointSize: 36, weight: .semibold)
+        micButton.setImage(UIImage(systemName: "mic.fill", withConfiguration: micConfig), for: .normal)
+        micButton.tintColor = .white
+        micButton.backgroundColor = .systemOrange
+        micButton.accessibilityLabel = "Hold to talk"
+        micButton.addTarget(self, action: #selector(micTouchDown), for: .touchDown)
+        micButton.addTarget(self, action: #selector(micTouchUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        // Long-press is the primary path; short tap still toggles via touchUp if hold didn't start record long enough — handled in controller via tap.
+        let tap = UITapGestureRecognizer(target: self, action: #selector(micTapRecognized))
+        tap.cancelsTouchesInView = false
+        micButton.addGestureRecognizer(tap)
+
+        waveform.translatesAutoresizingMaskIntoConstraints = false
+        waveform.isHidden = true
+
+        holdHint.font = .systemFont(ofSize: 12, weight: .medium)
+        holdHint.textColor = .secondaryLabel
+        holdHint.textAlignment = .center
+        holdHint.text = "Hold to talk · tap to toggle"
+
+        voiceToolbar.axis = .horizontal
+        voiceToolbar.spacing = 6
+        voiceToolbar.distribution = .fillEqually
+        voiceToolbar.translatesAutoresizingMaskIntoConstraints = false
+        for title in ["🌐", "ABC", "中文", "⌫", "return"] {
+            voiceToolbar.addArrangedSubview(makeChromeKey(title))
+        }
+
+        voiceStack.addArrangedSubview(micButton)
+        voiceStack.addArrangedSubview(waveform)
+        voiceStack.addArrangedSubview(holdHint)
+        voiceStack.addArrangedSubview(voiceToolbar)
+
+        NSLayoutConstraint.activate([
+            micButton.widthAnchor.constraint(equalToConstant: 96),
+            micButton.heightAnchor.constraint(equalToConstant: 96),
+            waveform.widthAnchor.constraint(equalTo: voiceStack.widthAnchor, multiplier: 0.7),
+            waveform.heightAnchor.constraint(equalToConstant: 28),
+            voiceToolbar.heightAnchor.constraint(equalToConstant: 44),
+            voiceToolbar.widthAnchor.constraint(equalTo: voiceStack.widthAnchor),
+        ])
+    }
+
+    private func buildTypingSurface() {
+        typingStack.axis = .vertical
+        typingStack.spacing = 6
+        typingStack.translatesAutoresizingMaskIntoConstraints = false
+
+        candidateScroll.showsHorizontalScrollIndicator = false
+        candidateScroll.translatesAutoresizingMaskIntoConstraints = false
+        candidateRow.axis = .horizontal
+        candidateRow.spacing = 6
+        candidateRow.translatesAutoresizingMaskIntoConstraints = false
+        candidateScroll.addSubview(candidateRow)
+        NSLayoutConstraint.activate([
+            candidateRow.leadingAnchor.constraint(equalTo: candidateScroll.contentLayoutGuide.leadingAnchor, constant: 4),
+            candidateRow.trailingAnchor.constraint(equalTo: candidateScroll.contentLayoutGuide.trailingAnchor, constant: -4),
+            candidateRow.topAnchor.constraint(equalTo: candidateScroll.contentLayoutGuide.topAnchor),
+            candidateRow.bottomAnchor.constraint(equalTo: candidateScroll.contentLayoutGuide.bottomAnchor),
+            candidateRow.heightAnchor.constraint(equalTo: candidateScroll.frameLayoutGuide.heightAnchor),
+        ])
+        candidateScroll.heightAnchor.constraint(equalToConstant: 36).isActive = true
+        candidateScroll.isHidden = true
+
+        keysStack.axis = .vertical
+        keysStack.spacing = 6
+        keysStack.distribution = .fillEqually
+
+        typingStack.addArrangedSubview(candidateScroll)
+        typingStack.addArrangedSubview(keysStack)
+    }
+
+    private func applyMode(_ mode: KeyboardSurfaceMode, animated: Bool) {
+        self.mode = mode
+        voiceStack.removeFromSuperview()
+        typingStack.removeFromSuperview()
+        contentHost.subviews.forEach { $0.removeFromSuperview() }
+
+        let surface: UIView
+        switch mode {
+        case .voice:
+            surface = voiceStack
+            clearPinyin()
+        case .typingEN, .typingCN:
+            rebuildTypingKeys()
+            surface = typingStack
+            candidateScroll.isHidden = (mode != .typingCN)
+        }
+
+        surface.translatesAutoresizingMaskIntoConstraints = false
+        contentHost.addSubview(surface)
+        NSLayoutConstraint.activate([
+            surface.leadingAnchor.constraint(equalTo: contentHost.leadingAnchor),
+            surface.trailingAnchor.constraint(equalTo: contentHost.trailingAnchor),
+            surface.topAnchor.constraint(equalTo: contentHost.topAnchor),
+            surface.bottomAnchor.constraint(equalTo: contentHost.bottomAnchor),
+        ])
+
+        if animated {
+            surface.alpha = 0
+            UIView.animate(withDuration: 0.18) { surface.alpha = 1 }
+        }
+    }
+
+    private func rebuildTypingKeys() {
+        keysStack.arrangedSubviews.forEach {
+            keysStack.removeArrangedSubview($0)
+            $0.removeFromSuperview()
+        }
+        shiftButton = nil
+
+        let rows: [[String]]
+        if mode == .typingCN {
+            rows = [
+                Array("qwertyuiop").map(String.init),
+                Array("asdfghjkl").map(String.init),
+                ["⇧"] + Array("zxcvbnm").map(String.init) + ["⌫"],
+                ["🌐", "🎤", "ABC", "空格", "确认"],
+            ]
+        } else {
+            rows = [
+                Array("qwertyuiop").map(String.init),
+                Array("asdfghjkl").map(String.init),
+                ["⇧"] + Array("zxcvbnm").map(String.init) + ["⌫"],
+                ["🌐", "🎤", "中文", "space", "return"],
+            ]
+        }
 
         for row in rows {
             let rowStack = UIStackView()
@@ -69,51 +314,19 @@ final class KeyboardView: UIView {
             for key in row {
                 let button = makeKey(key)
                 if key == "⇧" { shiftButton = button }
-                if key == "🎤" { micButton = button }
-                if key == "space" {
+                if key == "space" || key == "空格" {
                     button.setContentHuggingPriority(.defaultLow, for: .horizontal)
+                    button.widthAnchor.constraint(greaterThanOrEqualToConstant: 100).isActive = true
                 }
                 rowStack.addArrangedSubview(button)
-                if key == "space" {
-                    // Make space wider.
-                    button.widthAnchor.constraint(greaterThanOrEqualToConstant: 120).isActive = true
-                }
             }
-            stack.addArrangedSubview(rowStack)
+            keysStack.addArrangedSubview(rowStack)
         }
+        refreshCandidates()
     }
 
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    func setShift(_ on: Bool) {
-        shiftButton?.backgroundColor = on ? .systemBlue : .systemGray4
-        shiftButton?.setTitleColor(on ? .white : .label, for: .normal)
-    }
-
-    func setStatus(sessionOn: Bool, recording: Bool, needsFullAccess: Bool) {
-        if needsFullAccess {
-            statusLabel.text = "Full Access off · typing OK · dictation needs app + Full Access"
-            micButton?.backgroundColor = .systemGray3
-        } else if recording {
-            statusLabel.text = "Recording… tap 🎤 to stop"
-            micButton?.backgroundColor = .systemRed
-        } else if sessionOn {
-            statusLabel.text = "Session on · tap 🎤 to dictate"
-            micButton?.backgroundColor = .systemOrange
-        } else {
-            statusLabel.text = "No session · open AFK app → Start dictation session"
-            micButton?.backgroundColor = .systemGray3
-        }
-    }
-
-    func flash(_ message: String) {
-        let previous = statusLabel.text
-        statusLabel.text = message
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
-            if self?.statusLabel.text == message {
-                self?.statusLabel.text = previous
-            }
-        }
+    private func makeChromeKey(_ key: String) -> UIButton {
+        makeKey(key)
     }
 
     private func makeKey(_ key: String) -> UIButton {
@@ -121,30 +334,197 @@ final class KeyboardView: UIView {
         config.cornerStyle = .medium
         switch key {
         case "space": config.title = "space"
+        case "空格": config.title = "空格"
         case "return": config.title = "return"
+        case "确认": config.title = "确认"
         case "⌫": config.title = "⌫"
         case "⇧": config.title = "⇧"
         case "🌐": config.title = "🌐"
         case "🎤": config.title = "🎤"
+        case "ABC": config.title = "ABC"
+        case "中文": config.title = "中文"
         default: config.title = key
         }
         config.baseForegroundColor = .label
-        config.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 4, bottom: 10, trailing: 4)
+        config.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 2, bottom: 10, trailing: 2)
         let button = UIButton(configuration: config)
-        button.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
+        button.titleLabel?.font = .systemFont(ofSize: key.count > 1 ? 13 : 16, weight: .medium)
         button.addAction(UIAction { [weak self] _ in self?.handle(key) }, for: .touchUpInside)
         return button
     }
 
+    private func styleMic(ready: Bool, recording: Bool) {
+        if recording {
+            micButton.backgroundColor = .systemRed
+            micButton.transform = CGAffineTransform(scaleX: 1.06, y: 1.06)
+        } else if ready {
+            micButton.backgroundColor = .systemOrange
+            micButton.transform = .identity
+        } else {
+            micButton.backgroundColor = .systemGray3
+            micButton.transform = .identity
+        }
+    }
+
+    // MARK: - Mic gestures
+
+    @objc private func micTouchDown() {
+        isHoldingMic = true
+        holdDidFire = false
+        // Start after a short threshold so a flick-tap can still be toggle.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+            guard let self, self.isHoldingMic, !self.holdDidFire else { return }
+            self.holdDidFire = true
+            self.delegate?.keyboardMicHoldBegan()
+        }
+    }
+
+    @objc private func micTouchUp() {
+        let wasHolding = isHoldingMic
+        let didHold = holdDidFire
+        isHoldingMic = false
+        if wasHolding, didHold {
+            delegate?.keyboardMicHoldEnded()
+        }
+    }
+
+    @objc private func micTapRecognized() {
+        // If hold-to-talk already ran, ignore the tap.
+        guard !holdDidFire else { return }
+        delegate?.keyboardMicTapped()
+    }
+
+    // MARK: - Key handling
+
     private func handle(_ key: String) {
         switch key {
-        case "⌫": delegate?.keyboardDelete()
-        case "return": delegate?.keyboardReturn()
-        case "space": delegate?.keyboardSpace()
-        case "🌐": delegate?.keyboardNextKeyboard()
-        case "⇧": delegate?.keyboardToggleShift()
-        case "🎤": delegate?.keyboardMicTapped()
-        default: delegate?.keyboardInsert(key)
+        case "⌫":
+            if mode == .typingCN, !pinyinBuffer.isEmpty {
+                pinyinBuffer.removeLast()
+                refreshCandidates()
+            } else {
+                delegate?.keyboardDelete()
+            }
+        case "return", "确认":
+            if mode == .typingCN, !pinyinBuffer.isEmpty {
+                commitPinyinRaw()
+            } else {
+                delegate?.keyboardReturn()
+            }
+        case "space", "空格":
+            if mode == .typingCN {
+                if let first = candidates.first {
+                    selectCandidate(first)
+                } else if !pinyinBuffer.isEmpty {
+                    commitPinyinRaw()
+                } else {
+                    delegate?.keyboardSpace()
+                }
+            } else {
+                delegate?.keyboardSpace()
+            }
+        case "🌐":
+            delegate?.keyboardNextKeyboard()
+        case "⇧":
+            delegate?.keyboardToggleShift()
+        case "🎤":
+            delegate?.keyboardSwitchToVoice()
+        case "ABC":
+            delegate?.keyboardSwitchToTypingEN()
+        case "中文":
+            delegate?.keyboardSwitchToTypingCN()
+        default:
+            if mode == .typingCN, key.count == 1, key.first?.isLetter == true {
+                pinyinBuffer.append(contentsOf: key.lowercased())
+                refreshCandidates()
+            } else {
+                let out = shiftOn ? key.uppercased() : key
+                delegate?.keyboardInsert(out)
+                if shiftOn {
+                    shiftOn = false
+                    setShift(false)
+                }
+            }
+        }
+    }
+
+    private func refreshCandidates() {
+        candidates = mode == .typingCN ? PinyinIME.candidates(for: pinyinBuffer) : []
+        candidateRow.arrangedSubviews.forEach {
+            candidateRow.removeArrangedSubview($0)
+            $0.removeFromSuperview()
+        }
+        if !pinyinBuffer.isEmpty {
+            let buf = UILabel()
+            buf.text = " \(pinyinBuffer) "
+            buf.font = .monospacedSystemFont(ofSize: 14, weight: .medium)
+            buf.textColor = .secondaryLabel
+            candidateRow.addArrangedSubview(buf)
+        }
+        for word in candidates {
+            var config = UIButton.Configuration.plain()
+            config.title = word
+            config.baseForegroundColor = .label
+            config.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10)
+            let button = UIButton(configuration: config)
+            button.backgroundColor = .systemBackground
+            button.layer.cornerRadius = 8
+            button.addAction(UIAction { [weak self] _ in self?.selectCandidate(word) }, for: .touchUpInside)
+            candidateRow.addArrangedSubview(button)
+        }
+        candidateScroll.isHidden = mode != .typingCN
+    }
+
+    private func selectCandidate(_ word: String) {
+        delegate?.keyboardInsert(word)
+        clearPinyin()
+    }
+
+    private func commitPinyinRaw() {
+        guard !pinyinBuffer.isEmpty else { return }
+        delegate?.keyboardInsert(pinyinBuffer)
+        clearPinyin()
+    }
+
+    private func clearPinyin() {
+        pinyinBuffer = ""
+        candidates = []
+        refreshCandidates()
+    }
+}
+
+// MARK: - Waveform
+
+private final class WaveformView: UIView {
+    var level: Float = 0 {
+        didSet { setNeedsDisplay() }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        isOpaque = false
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func draw(_ rect: CGRect) {
+        guard let ctx = UIGraphicsGetCurrentContext() else { return }
+        let bars = 16
+        let spacing: CGFloat = 3
+        let totalSpacing = spacing * CGFloat(bars - 1)
+        let barWidth = max(2, (rect.width - totalSpacing) / CGFloat(bars))
+        let midY = rect.midY
+        let color = UIColor.systemOrange.cgColor
+        ctx.setFillColor(color)
+        for i in 0..<bars {
+            let phase = abs(sin(CGFloat(i) * 0.7 + CGFloat(level) * 8))
+            let h = max(4, CGFloat(level) * rect.height * (0.35 + 0.65 * phase))
+            let x = CGFloat(i) * (barWidth + spacing)
+            let y = midY - h / 2
+            let path = UIBezierPath(roundedRect: CGRect(x: x, y: y, width: barWidth, height: h), cornerRadius: 2)
+            ctx.addPath(path.cgPath)
+            ctx.fillPath()
         }
     }
 }

@@ -24,6 +24,7 @@
 		45098BE3C2B627BD2A93B31B /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 926C0C6E7FEA1899C88C34D5 /* KeyboardViewController.swift */; };
 		45356948F7925C83EA41C1D4 /* SimplePolisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95C59A4F1FF66BCA0176D1DE /* SimplePolisher.swift */; };
 		522F56D50EFF61622CA19C8C /* DarwinNotify.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C02928DA2EA10CB814C54C /* DarwinNotify.swift */; };
+		5322EDA99167DF57FC1BB15F /* PinyinIME.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E7BBA09713910A4AECCFCE6 /* PinyinIME.swift */; };
 		70C6DE11B9F3B28BBB63A8D5 /* PCMWav.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9191A3E34726EF0CCF199F5 /* PCMWav.swift */; };
 		7EEAC59D0F463312B2493937 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE71EE69BEEC537B8B566B77 /* KeychainStore.swift */; };
 		84D098088D73FAD7CD31C421 /* ApiKeyTester.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1191131D01510023DDD718C9 /* ApiKeyTester.swift */; };
@@ -78,6 +79,7 @@
 		37D99CA00EC588E0C39990B3 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		3E94D4A220AD9F16912BE17A /* IOSSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSSettings.swift; sourceTree = "<group>"; };
 		4E5B977C964C6F2C6EE5F5CE /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		6E7BBA09713910A4AECCFCE6 /* PinyinIME.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinyinIME.swift; sourceTree = "<group>"; };
 		8472317070F32DD0BF14E0E1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8BC9764F019B597126B82FA6 /* AFK.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AFK.entitlements; sourceTree = "<group>"; };
 		926C0C6E7FEA1899C88C34D5 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
@@ -125,6 +127,7 @@
 				C6398375D3281898E12312F8 /* Info.plist */,
 				936F2201530EDC979B5FF603 /* KeyboardView.swift */,
 				926C0C6E7FEA1899C88C34D5 /* KeyboardViewController.swift */,
+				6E7BBA09713910A4AECCFCE6 /* PinyinIME.swift */,
 			);
 			path = AFKKeyboard;
 			sourceTree = "<group>";
@@ -296,6 +299,7 @@
 				8AB920FA2F8585C37D2C0B08 /* KeychainStore.swift in Sources */,
 				B607DBA6214251986E58FB94 /* MockSpeechProvider.swift in Sources */,
 				0FF272159E10F4A4B157E740 /* PCMWav.swift in Sources */,
+				5322EDA99167DF57FC1BB15F /* PinyinIME.swift in Sources */,
 				2F92CF270E1D1D418A6EC918 /* SessionRelay.swift in Sources */,
 				45356948F7925C83EA41C1D4 /* SimplePolisher.swift in Sources */,
 				D94D0309389043BE174FAAF4 /* SpeechProvider.swift in Sources */,
@@ -380,7 +384,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 6FQUWPKXD8;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -463,7 +467,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 6FQUWPKXD8;
 				ENABLE_NS_ASSERTIONS = NO;

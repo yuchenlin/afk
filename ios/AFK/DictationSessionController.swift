@@ -21,24 +21,33 @@ final class DictationSessionController: ObservableObject {
     private let grok = GrokBatchSpeechClient()
     private let polisher = SimplePolisher()
     private var sessionTimer: Timer?
+    private var commandPollTimer: Timer?
     private var observers: [NSObjectProtocol] = []
 
     init() {
         syncFromRelay()
         capture.onLevel = { [weak self] level in
-            Task { @MainActor in self?.level = level }
+            Task { @MainActor in
+                self?.level = level
+                self?.relay.recordingLevel = level
+            }
         }
         observers.append(DarwinNotify.observe(AppGroupConstants.noteStartRecording) { [weak self] in
-            Task { @MainActor in try? await self?.startRecordingFromKeyboard() }
+            Task { @MainActor in self?.pollKeyboardCommand() }
         })
         observers.append(DarwinNotify.observe(AppGroupConstants.noteStopRecording) { [weak self] in
-            Task { @MainActor in await self?.stopRecordingAndTranscribe() }
+            Task { @MainActor in self?.pollKeyboardCommand() }
         })
+        // Always poll lightly so a missed Darwin notify still lands while the app is alive.
+        commandPollTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.pollKeyboardCommand() }
+        }
         Task { await refreshMicPermission() }
     }
 
     deinit {
         observers.forEach { DarwinNotify.stop($0) }
+        commandPollTimer?.invalidate()
     }
 
     func syncFromRelay() {
@@ -108,6 +117,7 @@ final class DictationSessionController: ObservableObject {
         sessionTimer = nil
         relay.isSessionActive = false
         relay.sessionExpiresAt = nil
+        relay.recordingLevel = 0
         isSessionActive = false
         status = "Session ended"
         relay.statusMessage = status
@@ -116,6 +126,20 @@ final class DictationSessionController: ObservableObject {
 
     func toggleSession() {
         if isSessionActive { endSession() } else { beginSession() }
+    }
+
+    private func pollKeyboardCommand() {
+        guard let pending = relay.consumeCommand() else { return }
+        handleKeyboardCommand(pending.command)
+    }
+
+    private func handleKeyboardCommand(_ command: SessionRelay.Command) {
+        switch command {
+        case .start:
+            Task { try? await startRecordingFromKeyboard() }
+        case .stop:
+            Task { await stopRecordingAndTranscribe() }
+        }
     }
 
     func startRecordingFromKeyboard() async throws {
@@ -147,6 +171,7 @@ final class DictationSessionController: ObservableObject {
         let pcm = capture.stop()
         isRecording = false
         relay.isRecording = false
+        relay.recordingLevel = 0
         level = 0
         status = "Transcribing…"
         relay.statusMessage = status
