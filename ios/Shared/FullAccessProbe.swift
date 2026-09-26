@@ -37,11 +37,22 @@ public enum FullAccessProbe {
 
     /// Host: publish a challenge the keyboard must echo after Full Access is confirmed.
     public static func publishHostChallenge(defaults: UserDefaults = SessionRelay.shared.defaults) {
+        // Pull sibling keys into this process cache first. A blind synchronize() after
+        // only writing challenge keys can otherwise drop a just-written keyboard report
+        // from the App Group plist (cfprefsd / UserDefaults multi-process race).
+        primeAppGroupCache(defaults)
         let token = "chal-\(UUID().uuidString)"
         defaults.set(token, forKey: AppGroupConstants.fullAccessHostChallengeKey)
         defaults.set(Date().timeIntervalSince1970, forKey: AppGroupConstants.fullAccessHostChallengeAtKey)
         defaults.synchronize()
         DarwinNotify.post(AppGroupConstants.noteFullAccessChanged)
+    }
+
+    private static func primeAppGroupCache(_ defaults: UserDefaults) {
+        _ = defaults.object(forKey: AppGroupConstants.fullAccessKeyboardReportedKey)
+        _ = defaults.object(forKey: AppGroupConstants.fullAccessKeyboardEchoKey)
+        _ = defaults.object(forKey: AppGroupConstants.fullAccessHostChallengeKey)
+        _ = defaults.object(forKey: AppGroupConstants.fullAccessKeyboardReportedAtKey)
     }
 
     /// Keyboard: when `hasFullAccess` is true and the container opens, echo the host challenge and mark reported.
@@ -50,6 +61,7 @@ public enum FullAccessProbe {
         // launched *before* Full Access still writes into the host-visible store.
         SessionRelay.shared.rebindAppGroupIfNeeded()
         let store = sharedSuiteDefaults() ?? defaults
+        primeAppGroupCache(store)
 
         guard hasFullAccess, canOpenContainer else {
             // Without the container we cannot reach the host suite — leave host state alone.
