@@ -4,9 +4,22 @@ import Foundation
 public final class SessionRelay {
     public static let shared = SessionRelay()
 
-    public let defaults: UserDefaults
-    /// False when the App Group container is missing (entitlement / provisioning problem).
-    public let usesAppGroup: Bool
+    private let suiteName: String
+    private var _defaults: UserDefaults
+    private var _usesAppGroup: Bool
+
+    /// App Group suite when available. May rebind after Full Access is enabled mid-lifetime
+    /// (keyboard often starts without FA, then Settings toggles it on).
+    public var defaults: UserDefaults {
+        rebindAppGroupIfNeeded()
+        return _defaults
+    }
+
+    /// False when the App Group container is missing (entitlement / provisioning / no Full Access).
+    public var usesAppGroup: Bool {
+        rebindAppGroupIfNeeded()
+        return _usesAppGroup
+    }
 
     public enum Command: String {
         case start
@@ -14,19 +27,35 @@ public final class SessionRelay {
     }
 
     public init(suiteName: String = AppGroupConstants.suiteName) {
+        self.suiteName = suiteName
+        let resolved = Self.resolve(suiteName: suiteName)
+        self._defaults = resolved.defaults
+        self._usesAppGroup = resolved.usesAppGroup
+    }
+
+    private static func resolve(suiteName: String) -> (defaults: UserDefaults, usesAppGroup: Bool) {
         let containerOK = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: suiteName) != nil
         if containerOK, let d = UserDefaults(suiteName: suiteName) {
-            self.defaults = d
-            self.usesAppGroup = true
-        } else if let d = UserDefaults(suiteName: suiteName), containerOK == false {
+            return (d, true)
+        }
+        if let d = UserDefaults(suiteName: suiteName) {
             // Keyboard without Full Access: suite object may exist but container is nil.
             // Prefer the suite anyway so in-process state works; sharing with host will fail.
-            self.defaults = d
-            self.usesAppGroup = false
-        } else {
-            self.defaults = .standard
-            self.usesAppGroup = false
+            return (d, false)
         }
+        return (.standard, false)
+    }
+
+    /// Call when Full Access / container may have become available since init.
+    @discardableResult
+    public func rebindAppGroupIfNeeded() -> Bool {
+        let resolved = Self.resolve(suiteName: suiteName)
+        guard resolved.usesAppGroup else { return _usesAppGroup }
+        if !_usesAppGroup {
+            _defaults = resolved.defaults
+            _usesAppGroup = true
+        }
+        return true
     }
 
     public var isSessionActive: Bool {

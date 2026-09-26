@@ -41,7 +41,7 @@ struct OnboardingView: View {
                         Image(systemName: fullAccessStatus.isOK ? "checkmark.circle.fill" : "exclamationmark.circle")
                             .foregroundStyle(fullAccessStatus.isOK ? .green : .orange)
                     }
-                    Text("In Keyboards → AFK → allow Full Access so the extension can use the App Group relay. Typing works without it; dictation does not. After enabling, switch to the AFK Keyboard once so Setup can confirm.")
+                    Text("In Keyboards → AFK → allow Full Access so the extension can use the App Group relay. Typing works without it; dictation does not. After enabling or changing Full Access, switch to the AFK Keyboard once so Setup can confirm — Recheck alone cannot see the toggle until the keyboard runs.")
                         .font(.footnote)
                     Button("Open AFK Settings") {
                         if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -49,8 +49,7 @@ struct OnboardingView: View {
                         }
                     }
                     Button("Recheck Full Access") {
-                        FullAccessProbe.publishHostChallenge()
-                        refreshFullAccess()
+                        recheckFullAccess()
                     }
                 }
 
@@ -69,7 +68,11 @@ struct OnboardingView: View {
                 }
             }
             .onAppear {
-                FullAccessProbe.publishHostChallenge()
+                // Only publish a challenge when not yet OK — rotating the challenge
+                // while already configured used to force a false "waiting" state.
+                if !FullAccessProbe.hostStatus().isOK {
+                    FullAccessProbe.publishHostChallenge()
+                }
                 refreshFullAccess()
             }
             .onChange(of: scenePhase) { _, phase in
@@ -77,7 +80,22 @@ struct OnboardingView: View {
                     refreshFullAccess()
                 }
             }
+            // Pick up keyboard reports while Setup stays open (Darwin → SwiftUI @State is awkward).
+            .onReceive(Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()) { _ in
+                refreshFullAccess()
+            }
         }
+    }
+
+    private func recheckFullAccess() {
+        // Publish a challenge for the keyboard to echo on next appear when we still
+        // need confirmation. Do not rotate the challenge when already configured —
+        // that previously made Recheck always look failed until the keyboard reopened.
+        if !FullAccessProbe.hostStatus().isOK {
+            FullAccessProbe.publishHostChallenge()
+        }
+        SessionRelay.shared.defaults.synchronize()
+        refreshFullAccess()
     }
 
     private func refreshFullAccess() {

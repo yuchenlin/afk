@@ -17,6 +17,13 @@ public enum FullAccessProbe {
         containerURL != nil
     }
 
+    /// Live App Group suite when the container is available. Prefer this over a
+    /// `SessionRelay` captured before Full Access was enabled (keyboard process).
+    public static func sharedSuiteDefaults() -> UserDefaults? {
+        guard canOpenContainer else { return nil }
+        return UserDefaults(suiteName: AppGroupConstants.suiteName)
+    }
+
     /// Same-process write/read against the App Group suite. Useful but not sufficient alone in the keyboard
     /// (a non-shared fallback store can still round-trip). Prefer combining with `canOpenContainer` / `hasFullAccess`.
     @discardableResult
@@ -39,20 +46,30 @@ public enum FullAccessProbe {
 
     /// Keyboard: when `hasFullAccess` is true and the container opens, echo the host challenge and mark reported.
     public static func reportFromKeyboard(hasFullAccess: Bool, defaults: UserDefaults = SessionRelay.shared.defaults) {
+        // Re-open the suite when the container is available so a keyboard that was
+        // launched *before* Full Access still writes into the host-visible store.
+        SessionRelay.shared.rebindAppGroupIfNeeded()
+        let store = sharedSuiteDefaults() ?? defaults
+
         guard hasFullAccess, canOpenContainer else {
-            defaults.set(false, forKey: AppGroupConstants.fullAccessKeyboardReportedKey)
-            defaults.removeObject(forKey: AppGroupConstants.fullAccessKeyboardEchoKey)
-            defaults.synchronize()
+            // Without the container we cannot reach the host suite — leave host state alone.
+            guard canOpenContainer || SessionRelay.shared.usesAppGroup else {
+                DarwinNotify.post(AppGroupConstants.noteFullAccessChanged)
+                return
+            }
+            store.set(false, forKey: AppGroupConstants.fullAccessKeyboardReportedKey)
+            store.removeObject(forKey: AppGroupConstants.fullAccessKeyboardEchoKey)
+            store.synchronize()
             DarwinNotify.post(AppGroupConstants.noteFullAccessChanged)
             return
         }
-        _ = readWriteProbe(defaults: defaults)
-        if let challenge = defaults.string(forKey: AppGroupConstants.fullAccessHostChallengeKey), !challenge.isEmpty {
-            defaults.set(challenge, forKey: AppGroupConstants.fullAccessKeyboardEchoKey)
+        _ = readWriteProbe(defaults: store)
+        if let challenge = store.string(forKey: AppGroupConstants.fullAccessHostChallengeKey), !challenge.isEmpty {
+            store.set(challenge, forKey: AppGroupConstants.fullAccessKeyboardEchoKey)
         }
-        defaults.set(true, forKey: AppGroupConstants.fullAccessKeyboardReportedKey)
-        defaults.set(Date().timeIntervalSince1970, forKey: AppGroupConstants.fullAccessKeyboardReportedAtKey)
-        defaults.synchronize()
+        store.set(true, forKey: AppGroupConstants.fullAccessKeyboardReportedKey)
+        store.set(Date().timeIntervalSince1970, forKey: AppGroupConstants.fullAccessKeyboardReportedAtKey)
+        store.synchronize()
         DarwinNotify.post(AppGroupConstants.noteFullAccessChanged)
     }
 
@@ -67,7 +84,7 @@ public enum FullAccessProbe {
             case .appGroupMissing: return "App Group not available — check Signing & App Groups"
             case .waitingForKeyboard: return "Not confirmed yet — open any text field and switch to AFK Keyboard once"
             case .configured: return "Configured (Full Access + App Group)"
-            case .keyboardReportedOff: return "Keyboard reported Full Access off"
+            case .keyboardReportedOff: return "Keyboard reported Full Access off — open AFK Keyboard once after enabling"
             }
         }
 
@@ -75,6 +92,11 @@ public enum FullAccessProbe {
     }
 
     /// Host-side status for Setup UI.
+    ///
+    /// A *pending* host challenge (Recheck / Setup appear) must **not** demote an
+    /// already-confirmed Full Access report to `.waitingForKeyboard`. The keyboard
+    /// only echoes when it next appears; until then `echo != challenge` is expected
+    /// and Recheck would always look broken after a successful confirm.
     public static func hostStatus(defaults: UserDefaults = SessionRelay.shared.defaults) -> HostStatus {
         guard canOpenContainer, SessionRelay.shared.usesAppGroup else {
             return .appGroupMissing
@@ -85,12 +107,11 @@ public enum FullAccessProbe {
             return .waitingForKeyboard
         }
         guard flagged else { return .keyboardReportedOff }
-        if let challenge = defaults.string(forKey: AppGroupConstants.fullAccessHostChallengeKey),
-           !challenge.isEmpty {
-            let echo = defaults.string(forKey: AppGroupConstants.fullAccessKeyboardEchoKey)
-            if echo == challenge { return .configured }
-            return .waitingForKeyboard
-        }
+
+        // Keyboard reported on (written into the App Group suite) is sufficient
+        // cross-process proof. Do not require echo == latest challenge — Recheck
+        // rotates the challenge and would otherwise always fail until the keyboard
+        // is opened again.
         return .configured
     }
 }
