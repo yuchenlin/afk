@@ -38,6 +38,12 @@ public enum AppGroupConstants {
     public static let commandAtKey = "command.at"
     public static let lastConsumedCommandIDKey = "command.lastConsumedID"
 
+    /// Host writes wall-clock while session keepalive is running. Keyboard uses this
+    /// to detect a suspended/dead host even when session.active is still true.
+    public static let hostHeartbeatAtKey = "host.heartbeatAt"
+    public static let hostAliveKey = "host.alive"
+
+
     // Full Access handshake (host writes challenge; keyboard with Full Access echoes)
     public static let fullAccessHostChallengeKey = "fullAccess.hostChallenge"
     public static let fullAccessHostChallengeAtKey = "fullAccess.hostChallengeAt"
@@ -52,6 +58,14 @@ public enum AppGroupConstants {
     public static let noteResultReady = "xyz.yuchenlin.afk.ios.resultReady"
     public static let noteSessionChanged = "xyz.yuchenlin.afk.ios.sessionChanged"
     public static let noteOpenHost = "xyz.yuchenlin.afk.ios.openHost"
+
+    /// URL scheme registered by the host (Info.plist). Keyboard opens this when the
+    /// host heartbeat is stale so iOS can wake / foreground AFK briefly.
+    public static let urlScheme = "afk"
+    public static let urlHostWake = "wake"
+    public static let urlHostRecord = "record"
+    public static let urlHostSession = "session"
+
     public static let noteFullAccessChanged = "xyz.yuchenlin.afk.ios.fullAccessChanged"
 
     public static let defaultSpeechModel = "grok-voice-transcribe-2.0"

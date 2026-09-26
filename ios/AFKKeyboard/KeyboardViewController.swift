@@ -11,6 +11,9 @@ final class KeyboardViewController: UIInputViewController {
     private var pollTimer: Timer?
     private var awaitingResult = false
     private var lastInsertedResultID: String?
+    private var pendingStartCommandID: String?
+    private var startWatchDeadline: Date?
+    private var didOfferHostWake = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -47,6 +50,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        didOfferHostWake = false
         refreshFullAccessState()
         refreshChrome()
         consumeResultIfNeeded()
@@ -72,9 +76,13 @@ final class KeyboardViewController: UIInputViewController {
 
     private func startPolling() {
         pollTimer?.invalidate()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
             self?.refreshChrome()
             self?.consumeResultIfNeeded()
+            self?.watchPendingStart()
+        }
+        if let pollTimer {
+            RunLoop.main.add(pollTimer, forMode: .common)
         }
     }
 
@@ -83,12 +91,14 @@ final class KeyboardViewController: UIInputViewController {
         let recording = relay.isRecording
         let level = relay.recordingLevel
         let hostStatus = relay.statusMessage
+        let hostAlive = relay.isHostHeartbeatFresh()
         keyboardView.setStatus(
             sessionOn: sessionOn,
             recording: recording,
             needsFullAccess: needsFullAccessBanner,
             level: level,
-            hostStatus: hostStatus
+            hostStatus: hostStatus,
+            hostAlive: hostAlive
         )
         if recording {
             keyboardView.setPreview("Listening…")
@@ -103,6 +113,8 @@ final class KeyboardViewController: UIInputViewController {
             keyboardView.flash(err)
             keyboardView.setPreview(nil)
             awaitingResult = false
+            pendingStartCommandID = nil
+            startWatchDeadline = nil
             relay.clearError()
             refreshChrome()
             return
@@ -114,10 +126,44 @@ final class KeyboardViewController: UIInputViewController {
         keyboardView.setPreview(result.text)
         keyboardView.flash("Inserted")
         awaitingResult = false
+        pendingStartCommandID = nil
+        startWatchDeadline = nil
         refreshChrome()
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
             self?.keyboardView.setPreview(nil)
         }
+    }
+
+    /// After posting start, confirm host actually began recording; otherwise surface failure + wake host.
+    private func watchPendingStart() {
+        guard let deadline = startWatchDeadline, let cmdID = pendingStartCommandID else { return }
+        if relay.isRecording {
+            pendingStartCommandID = nil
+            startWatchDeadline = nil
+            didOfferHostWake = false
+            return
+        }
+        // Host consumed our command but recording never flipped — still treat as progress.
+        if relay.lastConsumedCommandID == cmdID, relay.isHostHeartbeatFresh() {
+            // Give capture a moment after consume.
+            if Date() < deadline { return }
+        }
+        guard Date() >= deadline else { return }
+
+        pendingStartCommandID = nil
+        startWatchDeadline = nil
+
+        let hostAlive = relay.isHostHeartbeatFresh()
+        if !hostAlive {
+            keyboardView.flash("Host suspended — opening AFK…")
+            keyboardView.setPreview("Host not running · open AFK")
+            wakeHost(path: AppGroupConstants.urlHostWake)
+        } else {
+            keyboardView.flash("Host did not start mic")
+            keyboardView.setPreview("Host alive but mic did not start")
+            wakeHost(path: AppGroupConstants.urlHostRecord)
+        }
+        refreshChrome()
     }
 
     private func requestStartRecording() {
@@ -126,12 +172,22 @@ final class KeyboardViewController: UIInputViewController {
             return
         }
         if !relay.isSessionActive {
-            keyboardView.flash("Open AFK → Start session")
+            keyboardView.flash("No session — opening AFK…")
+            keyboardView.setPreview("Start session in AFK")
+            wakeHost(path: AppGroupConstants.urlHostSession)
             DarwinNotify.post(AppGroupConstants.noteOpenHost)
             return
         }
+        if !relay.isHostHeartbeatFresh() {
+            keyboardView.flash("Host asleep — opening AFK…")
+            keyboardView.setPreview("Session flag on, host not alive")
+            wakeHost(path: AppGroupConstants.urlHostWake)
+            // Still post the command so a freshly woken host can drain it.
+        }
         if relay.isRecording { return }
-        _ = relay.postCommand(.start)
+        let id = relay.postCommand(.start)
+        pendingStartCommandID = id
+        startWatchDeadline = Date().addingTimeInterval(1.2)
         keyboardView.flash("Listening…")
         awaitingResult = false
         refreshChrome()
@@ -142,6 +198,8 @@ final class KeyboardViewController: UIInputViewController {
         // Always post stop on release — host no-ops if not recording.
         _ = relay.postCommand(.stop)
         awaitingResult = true
+        pendingStartCommandID = nil
+        startWatchDeadline = nil
         keyboardView.flash("Transcribing…")
         keyboardView.setPreview("Transcribing…")
         refreshChrome()
@@ -153,7 +211,9 @@ final class KeyboardViewController: UIInputViewController {
             return
         }
         if !relay.isSessionActive {
-            keyboardView.flash("Open AFK → Start session")
+            keyboardView.flash("No session — opening AFK…")
+            keyboardView.setPreview("Start session in AFK")
+            wakeHost(path: AppGroupConstants.urlHostSession)
             DarwinNotify.post(AppGroupConstants.noteOpenHost)
             return
         }
@@ -162,6 +222,41 @@ final class KeyboardViewController: UIInputViewController {
         } else {
             requestStartRecording()
         }
+    }
+
+    /// Open the host via URL scheme (Full Access). Wakes a suspended AFK so keepalive can resume.
+    private func wakeHost(path: String) {
+        guard canUseAppGroup else { return }
+        if didOfferHostWake { return }
+        didOfferHostWake = true
+        guard let url = URL(string: "\(AppGroupConstants.urlScheme)://\(path)") else { return }
+        openURLFromExtension(url)
+        // Allow another wake attempt after a few seconds if user retries mic.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
+            self?.didOfferHostWake = false
+        }
+    }
+
+    private func openURLFromExtension(_ url: URL) {
+        var responder: UIResponder? = self
+        while let r = responder {
+            if let application = r as? UIApplication {
+                application.open(url, options: [:], completionHandler: nil)
+                return
+            }
+            responder = r.next
+        }
+        // Fallbacks used by some keyboard / iOS combinations with Full Access.
+        let sharedSel = NSSelectorFromString("sharedApplication")
+        let openSel = NSSelectorFromString("openURL:")
+        if let appClass = NSClassFromString("UIApplication") as? NSObject.Type,
+           appClass.responds(to: sharedSel),
+           let app = appClass.perform(sharedSel)?.takeUnretainedValue() as? NSObject,
+           app.responds(to: openSel) {
+            _ = app.perform(openSel, with: url)
+            return
+        }
+        extensionContext?.open(url, completionHandler: nil)
     }
 }
 

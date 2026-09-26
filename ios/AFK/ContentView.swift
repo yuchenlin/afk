@@ -13,6 +13,16 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
 
+                if session.isSessionActive {
+                    Text(session.keepaliveRunning
+                         ? "Background audio keepalive on — mic works from keyboard"
+                         : "Keepalive off — host may suspend; mic may do nothing")
+                        .font(.caption)
+                        .foregroundStyle(session.keepaliveRunning ? .green : .orange)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+
                 sessionButton
                 recordButton
 

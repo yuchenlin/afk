@@ -142,4 +142,33 @@ public final class SessionRelay {
         defaults.removeObject(forKey: AppGroupConstants.lastErrorKey)
         defaults.synchronize()
     }
+
+    /// Host: mark process as alive (called from session timer / keepalive).
+    public func touchHostHeartbeat(alive: Bool = true) {
+        defaults.set(alive, forKey: AppGroupConstants.hostAliveKey)
+        defaults.set(Date().timeIntervalSince1970, forKey: AppGroupConstants.hostHeartbeatAtKey)
+        // High-frequency — no synchronize / Darwin.
+    }
+
+    public func clearHostHeartbeat() {
+        defaults.set(false, forKey: AppGroupConstants.hostAliveKey)
+        defaults.set(0.0, forKey: AppGroupConstants.hostHeartbeatAtKey)
+        defaults.synchronize()
+    }
+
+    /// Keyboard: true if host wrote a heartbeat within `maxAge` seconds.
+    public func isHostHeartbeatFresh(maxAge: TimeInterval = 3.0) -> Bool {
+        guard defaults.bool(forKey: AppGroupConstants.hostAliveKey) else { return false }
+        let t = defaults.double(forKey: AppGroupConstants.hostHeartbeatAtKey)
+        guard t > 0 else { return false }
+        return Date().timeIntervalSince1970 - t <= maxAge
+    }
+
+    public var pendingCommandID: String? {
+        defaults.string(forKey: AppGroupConstants.commandIDKey)
+    }
+
+    public var lastConsumedCommandID: String? {
+        defaults.string(forKey: AppGroupConstants.lastConsumedCommandIDKey)
+    }
 }

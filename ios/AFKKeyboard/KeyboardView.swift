@@ -82,7 +82,8 @@ final class KeyboardView: UIView {
         recording: Bool,
         needsFullAccess: Bool,
         level: Float,
-        hostStatus: String
+        hostStatus: String,
+        hostAlive: Bool = true
     ) {
         waveform.level = recording ? level : 0
         waveform.isHidden = !recording || mode != .voice
@@ -97,8 +98,14 @@ final class KeyboardView: UIView {
             statusLabel.textColor = .systemRed
             styleMic(ready: true, recording: true)
             holdHint.text = "Release to send"
+        } else if sessionOn, !hostAlive {
+            statusLabel.text = "Session flagged on · host suspended — tap mic to wake AFK"
+            statusLabel.textColor = .systemOrange
+            styleMic(ready: true, recording: false)
+            holdHint.text = "Host not alive · tap opens AFK"
         } else if sessionOn {
-            statusLabel.text = hostStatus.isEmpty ? "Session on · hold mic to talk" : hostStatus
+            let base = hostStatus.isEmpty ? "Session on · hold mic to talk" : hostStatus
+            statusLabel.text = hostAlive ? base : base
             statusLabel.textColor = .secondaryLabel
             styleMic(ready: true, recording: false)
             holdHint.text = "Hold to talk · tap to toggle"

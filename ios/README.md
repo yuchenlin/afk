@@ -39,6 +39,8 @@ Or open `AFK-iOS.xcodeproj` directly if already generated.
 5. On device: Settings → General → Keyboard → Keyboards → Add **AFK** → enable **Allow Full Access**.
 6. In the AFK app: grant mic → **Start dictation session** → switch to AFK Keyboard. Default UI is voice (hold mic to talk / release to send, or tap to toggle). Use **ABC** / **中文** for typing; **🌐** for the next system keyboard.
 
+**Mic does nothing while orange?** Usually the host was suspended: `session.active` stayed true in the App Group but Darwin/timers were dead. Build 6+ plays a near-silent keepalive loop for the session window and writes a heartbeat; the keyboard shows “host suspended” and opens `afk://` if recording never starts.
+
 Mock STT is **off by default**. Paste an xAI key in Settings for live `grok-voice-transcribe-2.0` batch STT. With a key saved, the session path always uses Grok (never the Chinese mock string). Enable Mock STT only for offline / no-key smoke tests.
 
 ## What works vs stubs
@@ -48,9 +50,9 @@ Mock STT is **off by default**. Paste an xAI key in Settings for live `grok-voic
 | Xcode project (app + keyboard) | ✅ |
 | Onboarding + Settings (models, session length, Keychain) | ✅ |
 | Host record → mock / Grok batch STT → App Group | ✅ (streaming STT deferred) |
-| Background audio session keepalive | ✅ basic (`UIBackgroundModes: audio`) |
+| Background audio session keepalive | ✅ silent loop + host heartbeat (`UIBackgroundModes: audio`) |
 | Keyboard voice-first + ABC/中文 typing + globe | ✅ Typeless-like |
-| Mic hold/tap → App Group command + Darwin → insertText | ✅ |
+| Mic hold/tap → App Group command + Darwin → insertText | ✅ (+ host-alive check, `afk://` wake) |
 | Full Mac Polisher / lexicon / streaming Grok | ❌ stub / simplified |
 | Live Activity / Control Center / iCloud | ❌ TODO |
 | App Store assets / consent / privacy policy | ❌ not claimed |

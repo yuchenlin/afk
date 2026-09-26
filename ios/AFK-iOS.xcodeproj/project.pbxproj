@@ -19,6 +19,7 @@
 		28CB4D2895964E3851084899 /* AudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7ADDDB356A180CC242A157B /* AudioCapture.swift */; };
 		28F349764E271191D5AFA7C4 /* GrokBatchSpeechClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BB709886DC6A2FD48C192D /* GrokBatchSpeechClient.swift */; };
 		2F92CF270E1D1D418A6EC918 /* SessionRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 039253DB261DD916A4ADF1DB /* SessionRelay.swift */; };
+		3CB4A41345311715533BF710 /* SessionKeepalive.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF5B4CB500BA9AF183C17D1A /* SessionKeepalive.swift */; };
 		3D0FAE9A9F61D0333DD3E17E /* MockSpeechProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3729EE1C2DC0F85BAC53E12E /* MockSpeechProvider.swift */; };
 		40E5FCF07FDC9FA0105803E6 /* ApiKeyTester.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1191131D01510023DDD718C9 /* ApiKeyTester.swift */; };
 		45098BE3C2B627BD2A93B31B /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 926C0C6E7FEA1899C88C34D5 /* KeyboardViewController.swift */; };
@@ -36,6 +37,7 @@
 		B607DBA6214251986E58FB94 /* MockSpeechProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3729EE1C2DC0F85BAC53E12E /* MockSpeechProvider.swift */; };
 		BD3B64F311F7429CBEBFE0B0 /* DarwinNotify.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C02928DA2EA10CB814C54C /* DarwinNotify.swift */; };
 		BF534EDDA8BDDFF168618F8B /* AppGroupConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = A388F0BF6E22BFE34EC01512 /* AppGroupConstants.swift */; };
+		C00F57A16D16CB120CA4158E /* SessionKeepalive.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF5B4CB500BA9AF183C17D1A /* SessionKeepalive.swift */; };
 		C6EF0009C89C8211B0FC1498 /* IOSSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E94D4A220AD9F16912BE17A /* IOSSettings.swift */; };
 		CA44BBAFE1046BD4C302B233 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19EE92ECDC6803FDE679FB0 /* SettingsView.swift */; };
 		D94D0309389043BE174FAAF4 /* SpeechProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D1D39EB47EAC68C5AB5EEC8 /* SpeechProvider.swift */; };
@@ -95,6 +97,7 @@
 		C6398375D3281898E12312F8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		CB9B516D9230B085E472B7C5 /* AFKKeyboard.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = AFKKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D7ADDDB356A180CC242A157B /* AudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCapture.swift; sourceTree = "<group>"; };
+		DF5B4CB500BA9AF183C17D1A /* SessionKeepalive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionKeepalive.swift; sourceTree = "<group>"; };
 		E479D8CF811090FE61F1ECD8 /* DictationSessionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationSessionController.swift; sourceTree = "<group>"; };
 		EE71EE69BEEC537B8B566B77 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		F2C02928DA2EA10CB814C54C /* DarwinNotify.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarwinNotify.swift; sourceTree = "<group>"; };
@@ -160,6 +163,7 @@
 				EE71EE69BEEC537B8B566B77 /* KeychainStore.swift */,
 				3729EE1C2DC0F85BAC53E12E /* MockSpeechProvider.swift */,
 				B9191A3E34726EF0CCF199F5 /* PCMWav.swift */,
+				DF5B4CB500BA9AF183C17D1A /* SessionKeepalive.swift */,
 				039253DB261DD916A4ADF1DB /* SessionRelay.swift */,
 				95C59A4F1FF66BCA0176D1DE /* SimplePolisher.swift */,
 				1D1D39EB47EAC68C5AB5EEC8 /* SpeechProvider.swift */,
@@ -276,6 +280,7 @@
 				3D0FAE9A9F61D0333DD3E17E /* MockSpeechProvider.swift in Sources */,
 				F768322C7381C24BD302B29E /* OnboardingView.swift in Sources */,
 				70C6DE11B9F3B28BBB63A8D5 /* PCMWav.swift in Sources */,
+				3CB4A41345311715533BF710 /* SessionKeepalive.swift in Sources */,
 				1DD7E7147588C2CB7408C060 /* SessionRelay.swift in Sources */,
 				CA44BBAFE1046BD4C302B233 /* SettingsView.swift in Sources */,
 				8A643D445C21F650F2F5BAF6 /* SimplePolisher.swift in Sources */,
@@ -300,6 +305,7 @@
 				B607DBA6214251986E58FB94 /* MockSpeechProvider.swift in Sources */,
 				0FF272159E10F4A4B157E740 /* PCMWav.swift in Sources */,
 				5322EDA99167DF57FC1BB15F /* PinyinIME.swift in Sources */,
+				C00F57A16D16CB120CA4158E /* SessionKeepalive.swift in Sources */,
 				2F92CF270E1D1D418A6EC918 /* SessionRelay.swift in Sources */,
 				45356948F7925C83EA41C1D4 /* SimplePolisher.swift in Sources */,
 				D94D0309389043BE174FAAF4 /* SpeechProvider.swift in Sources */,
@@ -384,7 +390,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 6FQUWPKXD8;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -467,7 +473,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 6FQUWPKXD8;
 				ENABLE_NS_ASSERTIONS = NO;

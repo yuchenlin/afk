@@ -14,9 +14,11 @@ final class DictationSessionController: ObservableObject {
     @Published var level: Float = 0
     @Published var micGranted = false
     @Published var errorMessage: String?
+    @Published var keepaliveRunning = false
 
     private let relay = SessionRelay.shared
     private let capture = AudioCapture()
+    private let keepalive = SessionKeepalive()
     private let mock = MockSpeechProvider()
     private let grok = GrokBatchSpeechClient()
     private let polisher = SimplePolisher()
@@ -38,9 +40,20 @@ final class DictationSessionController: ObservableObject {
         observers.append(DarwinNotify.observe(AppGroupConstants.noteStopRecording) { [weak self] in
             Task { @MainActor in self?.pollKeyboardCommand() }
         })
+        observers.append(DarwinNotify.observe(AppGroupConstants.noteOpenHost) { [weak self] in
+            Task { @MainActor in
+                // Best-effort: only runs if host is already awake.
+                self?.status = "Keyboard asked to open AFK"
+                self?.relay.statusMessage = self?.status ?? ""
+            }
+        })
         // Always poll lightly so a missed Darwin notify still lands while the app is alive.
-        commandPollTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { [weak self] _ in
+        commandPollTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.pollKeyboardCommand() }
+        }
+        // Ensure poll timer fires in common run-loop modes (scroll / tracking).
+        if let commandPollTimer {
+            RunLoop.main.add(commandPollTimer, forMode: .common)
         }
         Task { await refreshMicPermission() }
     }
@@ -65,7 +78,6 @@ final class DictationSessionController: ObservableObject {
     func saveSettings() {
         settings.save()
         if isSessionActive {
-            // Refresh expiry window if session length changed.
             beginSession(restartTimerOnly: true)
         }
     }
@@ -83,6 +95,7 @@ final class DictationSessionController: ObservableObject {
         sessionTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
+                self.relay.touchHostHeartbeat(alive: true)
                 if let exp = self.relay.sessionExpiresAt {
                     let left = Int(exp.timeIntervalSinceNow)
                     if left <= 0 {
@@ -94,18 +107,16 @@ final class DictationSessionController: ObservableObject {
                 }
             }
         }
-
-        // Activate audio session so background mode can keep the orange mic indicator.
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .allowBluetoothHFP])
-            try session.setActive(true)
-        } catch {
-            errorMessage = "Audio session: \(error.localizedDescription)"
+        if let sessionTimer {
+            RunLoop.main.add(sessionTimer, forMode: .common)
         }
 
+        // Silent looping audio is what actually keeps us unsuspended under UIBackgroundModes:audio.
+        startKeepaliveIfNeeded()
+        relay.touchHostHeartbeat(alive: true)
+
         if !restartTimerOnly {
-            // Soft keepalive beep intentionally omitted.
+            // Soft keepalive beep intentionally omitted — SessionKeepalive is the real assertion.
         }
     }
 
@@ -115,6 +126,9 @@ final class DictationSessionController: ObservableObject {
         }
         sessionTimer?.invalidate()
         sessionTimer = nil
+        keepalive.stop()
+        keepaliveRunning = false
+        relay.clearHostHeartbeat()
         relay.isSessionActive = false
         relay.sessionExpiresAt = nil
         relay.recordingLevel = 0
@@ -126,6 +140,34 @@ final class DictationSessionController: ObservableObject {
 
     func toggleSession() {
         if isSessionActive { endSession() } else { beginSession() }
+    }
+
+    /// Deep link / URL scheme entry (`afk://wake`, `afk://session`, `afk://record`).
+    func handleOpenURL(_ url: URL) {
+        guard url.scheme == AppGroupConstants.urlScheme else { return }
+        let host = (url.host ?? url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))).lowercased()
+        if !isSessionActive {
+            beginSession()
+        }
+        status = "Session ready for keyboard"
+        relay.statusMessage = status
+        // Drain any keyboard command that was posted while we were suspended.
+        pollKeyboardCommand()
+        if host == AppGroupConstants.urlHostRecord, !isRecording {
+            Task { try? await startRecordingFromKeyboard() }
+        }
+    }
+
+    private func startKeepaliveIfNeeded() {
+        do {
+            try keepalive.start()
+            keepaliveRunning = true
+        } catch {
+            keepaliveRunning = false
+            errorMessage = "Background audio keepalive failed: \(error.localizedDescription)"
+            status = "Keepalive failed — stay in AFK"
+            relay.statusMessage = status
+        }
     }
 
     private func pollKeyboardCommand() {
@@ -146,6 +188,7 @@ final class DictationSessionController: ObservableObject {
         guard isSessionActive || relay.isSessionActive else {
             relay.publishError("Start a dictation session in the AFK app first.")
             status = "No active session"
+            relay.statusMessage = status
             return
         }
         if !isSessionActive { beginSession() }
@@ -159,9 +202,20 @@ final class DictationSessionController: ObservableObject {
             guard micGranted else { throw AudioCapture.CaptureError.noPermission }
         }
         if !isSessionActive { beginSession() }
-        try capture.start()
+
+        // Pause silent loop so AVAudioEngine can own the input; resume after stop.
+        keepalive.stop()
+        keepaliveRunning = false
+
+        do {
+            try capture.start()
+        } catch {
+            startKeepaliveIfNeeded()
+            throw error
+        }
         isRecording = true
         relay.isRecording = true
+        relay.touchHostHeartbeat(alive: true)
         status = "Recording…"
         relay.statusMessage = status
     }
@@ -175,6 +229,12 @@ final class DictationSessionController: ObservableObject {
         level = 0
         status = "Transcribing…"
         relay.statusMessage = status
+
+        // Resume keepalive so the session stays unsuspended for the next utterance.
+        if isSessionActive || relay.isSessionActive {
+            startKeepaliveIfNeeded()
+            relay.touchHostHeartbeat(alive: true)
+        }
 
         do {
             // Reload so Keychain / App Group migrations apply even if Settings sheet wasn't opened.
