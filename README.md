@@ -13,13 +13,16 @@ See [docs/PRIOR_ART.md](docs/PRIOR_ART.md). Fn + paste adapted from [Scribe](htt
 ```bash
 git clone https://github.com/yuchenlin/afk.git
 cd afk
-make dev-cert       # once: stable signing so Accessibility survives rebuilds
-make install        # → /Applications/AFK.app
+make install        # → /Applications/AFK.app (uses Apple Development or `make dev-cert`)
 make api-key        # optional: writes $XAI_API_KEY_VOICE to the key file (or paste it in Settings…)
 open /Applications/AFK.app
 ```
 
-Needs **full Xcode.app** (CLT alone fails on Swift 6.4 with a cryptic plist parse error). PiggyHouse is the intended build machine. Grant **Accessibility** (shortcut + paste) and **Microphone**. The API key is `XAI_API_KEY_VOICE`, read from the environment or `~/Library/Application Support/AFK/xai-api-key`; it is never compiled into the app (local dev only — production needs a proxy, see docs/PLAN.md).
+Needs **full Xcode.app** (CLT alone fails on Swift 6.4 with a cryptic plist parse error). PiggyHouse is the intended build machine.
+
+**Permissions (do this once on a stably-signed build):** menu bar ⚠︎ → **Grant Accessibility…** / **Grant Microphone…**, or System Settings → Privacy & Security → enable **AFK** under Accessibility and Microphone. `make install` signs with a stable identity (Apple Development if present, else `make dev-cert`) so grants **survive rebuilds**. Ad-hoc signing (`codesign -`) changes the CDHash every build and macOS forgets the grants — `make install` refuses that. After switching from an old ad-hoc install, remove ghost **AFK** rows in Accessibility, then enable the new `/Applications/AFK.app` once.
+
+The API key is `XAI_API_KEY_VOICE`, read from the environment or `~/Library/Application Support/AFK/xai-api-key`; it is never compiled into the app (local dev only — production needs a proxy, see docs/PLAN.md).
 
 ## Use
 

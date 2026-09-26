@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import AVFoundation
+import Security
 
 /// Menu-bar agent: hold the shortcut (⌘G by default) → Grok speech-to-text → paste at caret.
 @MainActor
@@ -61,6 +62,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
     private var permissionTimer: Timer?
     private var hasPermission = false
     private var permissionItem: NSMenuItem!
+    private var microphonePermissionItem: NSMenuItem!
+    private var signingWarningItem: NSMenuItem!
     private var hintItem: NSMenuItem!
     private var enableItem: NSMenuItem!
     private var shortcutItem: NSMenuItem!
@@ -96,8 +99,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
             overlay.showNotice("AFK needs Accessibility permission — see the menu bar", symbol: "exclamationmark.triangle.fill", autoHideAfter: 4)
         }
         if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
-            AVCaptureDevice.requestAccess(for: .audio) { _ in }
+            AVCaptureDevice.requestAccess(for: .audio) { [self] granted in
+                DispatchQueue.main.async {
+                    self.refreshPermissionMenuItems()
+                    if !granted {
+                        self.showMicrophoneAlert()
+                    }
+                }
+            }
         }
+        refreshPermissionMenuItems()
         runSelfTestIfRequested()
 
         NotificationCenter.default.addObserver(
@@ -146,7 +157,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
 
     private func setPermission(_ granted: Bool) {
         hasPermission = granted
-        permissionItem.isHidden = granted
+        refreshPermissionMenuItems()
         refreshShortcutMenu()
         refreshIdleTitle()
     }
@@ -244,10 +255,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         case .authorized:
             break
         case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .audio) { _ in }
+            AVCaptureDevice.requestAccess(for: .audio) { [self] granted in
+                DispatchQueue.main.async {
+                    self.refreshPermissionMenuItems()
+                    if !granted { self.showMicrophoneAlert() }
+                }
+            }
             return "Allow microphone access, then try again"
         default:
-            return "Microphone is off for AFK — System Settings → Privacy & Security → Microphone"
+            showMicrophoneAlert()
+            return "Microphone is off for AFK — open System Settings from the menu"
         }
 
         let session: SpeechSession
@@ -586,6 +603,23 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         permissionItem.target = self
         menu.addItem(permissionItem)
 
+        microphonePermissionItem = NSMenuItem(
+            title: "⚠️ Grant Microphone Permission…",
+            action: #selector(openMicrophoneSettings(_:)),
+            keyEquivalent: ""
+        )
+        microphonePermissionItem.target = self
+        menu.addItem(microphonePermissionItem)
+
+        signingWarningItem = NSMenuItem(
+            title: "⚠️ Ad-hoc signed — rebuilds reset permissions",
+            action: nil,
+            keyEquivalent: ""
+        )
+        signingWarningItem.isEnabled = false
+        signingWarningItem.isHidden = true
+        menu.addItem(signingWarningItem)
+
         apiItem = NSMenuItem(title: "", action: #selector(openSettings(_:)), keyEquivalent: "")
         apiItem.target = self
         apiItem.isHidden = true
@@ -676,7 +710,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         refreshOutputMenu()
         refreshHistoryMenu()
         refreshShortcutMenu()
-        refreshIdleTitle()
+        refreshPermissionMenuItems()
     }
 
     /// Menu bar shows the AFK face; `active` (filled) while recording, plus optional text.
@@ -696,12 +730,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
 
     private func refreshIdleTitle() {
         guard !isRecordingShortcut else { return }
-        if hasPermission {
+        let micOK = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        if hasPermission && micOK {
             setStatusIcon(active: false, text: nil)
             statusItem.button?.toolTip = "AFK — \(talkHint)"
         } else {
             setStatusIcon(active: false, text: "⚠︎")
-            statusItem.button?.toolTip = "AFK needs Accessibility permission"
+            if !hasPermission {
+                statusItem.button?.toolTip = "AFK needs Accessibility permission"
+            } else {
+                statusItem.button?.toolTip = "AFK needs Microphone permission"
+            }
         }
     }
 
@@ -966,7 +1005,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
 
     public func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === statusItem.menu || menu === microphoneItem.submenu { refreshMicrophoneMenu() }
-        if menu === statusItem.menu { refreshHistoryMenu() }
+        if menu === statusItem.menu {
+            refreshHistoryMenu()
+            refreshPermissionMenuItems()
+        }
     }
 
     // MARK: - Permissions
@@ -976,13 +1018,42 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         _ = AXIsProcessTrustedWithOptions(opts)
     }
 
+    private func refreshPermissionMenuItems() {
+        permissionItem?.isHidden = hasPermission
+        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        microphonePermissionItem?.isHidden = (micStatus == .authorized)
+        signingWarningItem?.isHidden = !isAdHocSigned
+        if !isRecordingShortcut {
+            refreshIdleTitle()
+        }
+    }
+
+    /// Ad-hoc (CDHash-only) signatures change on every rebuild, so TCC forgets grants.
+    private var isAdHocSigned: Bool {
+        var code: SecStaticCode?
+        let url = Bundle.main.bundleURL as CFURL
+        guard SecStaticCodeCreateWithPath(url, [], &code) == errSecSuccess, let code else {
+            return true
+        }
+        var info: CFDictionary?
+        guard SecCodeCopySigningInformation(code, SecCSFlags(rawValue: kSecCSSigningInformation), &info) == errSecSuccess,
+              let info = info as? [String: Any]
+        else { return true }
+        // No signing authority chain ⇒ ad-hoc / unsigned.
+        if let certs = info[kSecCodeInfoCertificates as String] as? [Any], !certs.isEmpty {
+            return false
+        }
+        return true
+    }
+
     private func showAccessibilityAlert() {
         let alert = NSAlert()
         alert.messageText = "Accessibility required"
         alert.informativeText = """
         AFK needs Accessibility to watch its shortcut (\(hotkey.displayName)) and paste into other apps.
 
-        System Settings → Privacy & Security → Accessibility → enable AFK, and AFK starts listening within a few seconds.
+        System Settings → Privacy & Security → Accessibility → enable AFK.
+        If you see several “AFK” rows, remove the old ones (from ad-hoc builds) and enable the current /Applications/AFK.app. AFK starts listening within a few seconds.
         """
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Open Settings")
@@ -994,9 +1065,56 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         }
     }
 
+    private func showMicrophoneAlert() {
+        let alert = NSAlert()
+        alert.messageText = "Microphone required"
+        alert.informativeText = """
+        AFK records while you hold its shortcut so it can turn speech into text at the caret.
+
+        System Settings → Privacy & Security → Microphone → enable AFK.
+        """
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Open Settings")
+        alert.addButton(withTitle: "OK")
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn {
+            openMicrophonePane()
+        }
+    }
+
+    @objc private func openMicrophoneSettings(_ sender: NSMenuItem) {
+        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        if status == .notDetermined {
+            AVCaptureDevice.requestAccess(for: .audio) { [self] granted in
+                DispatchQueue.main.async {
+                    self.refreshPermissionMenuItems()
+                    if !granted { self.openMicrophonePane() }
+                }
+            }
+        } else {
+            openMicrophonePane()
+        }
+    }
+
     private func openAccessibilityPane() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            NSWorkspace.shared.open(url)
+        openPrivacyPane(anchors: [
+            "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Accessibility",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+        ])
+    }
+
+    private func openMicrophonePane() {
+        openPrivacyPane(anchors: [
+            "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Microphone",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
+        ])
+    }
+
+    private func openPrivacyPane(anchors: [String]) {
+        for anchor in anchors {
+            if let url = URL(string: anchor), NSWorkspace.shared.open(url) {
+                return
+            }
         }
     }
 }
