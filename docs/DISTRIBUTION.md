@@ -14,27 +14,70 @@ Recommendation (unchanged from the release plan): ship **direct download first**
 
 ## PiggyHouse status (checked locally)
 
-On the build Mac used for this work:
+On **PiggyHouse** (build Mac for this work), as of the last agent check:
 
-- **Codesigning identities:** `Apple Development: …` only — **no** `Developer ID Application: …`.
-- **Notary:** `xcrun notarytool` is available; **no** keychain profile is stored yet (`store-credentials` has not been run for AFK).
-- **Implication:** Xcode → Settings → Accounts (signed into the Apple Developer team) gives you **Apple Development** for local builds/TCC. It does **not** by itself create a **Developer ID Application** certificate. Stranger installs still need the steps below.
+| Item | Value |
+|---|---|
+| Apple ID (Xcode) | `billyuchenlin@gmail.com` |
+| Team | **Yuchen Lin** — Team ID **`6FQUWPKXD8`** |
+| Apple Development | Present (`Apple Development: billyuchenlin@gmail.com (2566R646PN)`) |
+| **Developer ID Application** | **Missing** |
+| notarytool | Present (Xcode) |
+| Notary keychain profile `AFK-notary` | Not stored yet |
 
-Re-check anytime:
+**Implication:** Paid Apple Developer Program membership + Xcode Accounts login gives **Apple Development** for local builds/TCC. It does **not** create a **Developer ID Application** certificate by itself. Stranger installs still need the one-time steps below.
+
+Re-check anytime (preferred):
 
 ```bash
+make signing-status
+# or:
 security find-identity -v -p codesigning
-# Look for: Developer ID Application: Your Name (TEAMID)
+# Look for: Developer ID Application: Yuchen Lin (6FQUWPKXD8)
 xcrun notarytool history --keychain-profile AFK-notary   # after you create that profile
 ```
 
-## Creating Developer ID (after Program enrollment)
+## Creating Developer ID (one-time on PiggyHouse)
 
-1. Confirm membership at [developer.apple.com/account](https://developer.apple.com/account) (paid Apple Developer Program).
-2. **Certificates, Identifiers & Profiles** → Certificates → **+** → **Developer ID Application** → follow the CSR flow (Keychain Access → Certificate Assistant → Request a Certificate From a Certificate Authority), download, double-click to install.
-   - Or in **Xcode → Settings → Accounts → [team] → Manage Certificates… → + → Developer ID Application**.
-3. Verify: `security find-identity -v -p codesigning` lists `Developer ID Application: …`.
-4. Only then will `make dmg` re-sign with Developer ID (Hardened Runtime). Still run notarization separately (next section).
+You already pay for the Apple Developer Program. Creating **Developer ID Application** needs the Mac GUI (password / Touch ID / 2FA). An agent with only Shell on PiggyHouse **cannot** click Xcode for you.
+
+### Preferred — Xcode (fewest steps)
+
+1. Open **Xcode** on PiggyHouse.
+2. **Xcode → Settings…** (⌘,) → **Accounts**.
+3. Select Apple ID **`billyuchenlin@gmail.com`** (add it if missing).
+4. Select team **Yuchen Lin (`6FQUWPKXD8`)** → **Manage Certificates…**.
+5. Click **+** (bottom left) → **Developer ID Application**.
+6. If prompted, enter your **Mac login password** or use **Touch ID**. Wait until a row like `Developer ID Application: Yuchen Lin (6FQUWPKXD8)` appears.
+7. Close the sheets. Tell the agent **“done”** (or run yourself):
+
+   ```bash
+   make signing-status && make dmg
+   ```
+
+   When Developer ID is present, `scripts/make-dmg.sh` **re-signs with Hardened Runtime** automatically. Notarization is still a separate step (next section) — do **not** paste passwords into chat; run `store-credentials` locally.
+
+### Alternate — developer.apple.com + Keychain CSR
+
+1. Confirm membership at [developer.apple.com/account](https://developer.apple.com/account) while signed in as **`billyuchenlin@gmail.com`**.
+2. **Certificates, Identifiers & Profiles** → **Certificates** → **+** → **Developer ID Application** → Continue.
+3. On PiggyHouse: open **Keychain Access** → **Keychain Access → Certificate Assistant → Request a Certificate From a Certificate Authority…**
+   - User Email: `billyuchenlin@gmail.com`
+   - Common Name: e.g. `Yuchen Lin Developer ID`
+   - CA Email: leave blank
+   - Select **Saved to disk** → Continue → save the `.certSigningRequest`
+4. Upload that CSR in the portal → download the `.cer` → double-click to install into the **login** keychain.
+5. Verify / package:
+
+   ```bash
+   make signing-status && make dmg
+   ```
+
+### If “Developer ID Application” is greyed out or missing
+
+- Confirm the paid Program shows **Active** under Membership (Team **`6FQUWPKXD8`**).
+- In Xcode Accounts, use the **team** row (not only the personal free team) before Manage Certificates.
+- Apple limits how many Developer ID certs a team may hold; revoke an unused one on the portal only if you are sure no other Mac still needs its private key.
 
 ## DMG packaging (what we have today)
 
@@ -84,8 +127,8 @@ Do **not** paste Apple ID passwords, app-specific passwords, or `.p8` API keys i
    # Option A — Apple ID + app-specific password (appleid.apple.com → Sign-In and Security
    # → App-Specific Passwords). Team ID is on developer.apple.com → Membership.
    xcrun notarytool store-credentials AFK-notary \
-     --apple-id "YOUR_APPLE_ID@example.com" \
-     --team-id "YOUR_TEAM_ID" \
+     --apple-id "billyuchenlin@gmail.com" \
+     --team-id "6FQUWPKXD8" \
      --password   # omit value to get a secure prompt
 
    # Option B — App Store Connect API key (.p8 + Key ID + Issuer ID)
@@ -122,3 +165,4 @@ Until the first notarized asset exists, the README should say Releases are comin
 - [BUILD.md](BUILD.md) — local Xcode build, `make install`, stable signing for TCC
 - [RELEASE_PLAN.md](RELEASE_PLAN.md) — open source checklist, App Store vs direct, iOS
 - `scripts/make-dmg.sh` — DMG packaging only (no notarization)
+- `scripts/check-signing.sh` / `make signing-status` — read-only: Development vs Developer ID vs notary profile

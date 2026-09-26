@@ -14,7 +14,7 @@ CODESIGN_IDENTITY ?= $(shell \
 		test -n "$$id" && echo "$$id" || echo -; \
 	else echo -; fi)
 
-.PHONY: build clean run install dmg dev-cert api-key icons check-sign
+.PHONY: build clean run install dmg dev-cert api-key icons check-sign signing-status
 
 check-sign:
 	@id="$(CODESIGN_IDENTITY)"; \
@@ -30,6 +30,12 @@ check-sign:
 		exit 1; \
 	fi; \
 	echo "✅ Signing as $$id"
+
+# Read-only report: Apple Development vs Developer ID vs notary profile.
+# Does not create certs or store credentials. See docs/DISTRIBUTION.md.
+signing-status:
+	./scripts/check-signing.sh
+
 
 build:
 	swift build -c release
