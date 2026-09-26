@@ -33,7 +33,18 @@ Needs **full Xcode.app** (CLT alone fails on Swift 6.4 with a cryptic plist pars
 8. Menu → **Vocabulary…**: your own words and phrases, one per line (names, product terms, jargon such as GRPO, Hotshot, 宇辰). They're sent to Grok as key terms (max 100, each ≤ 50 characters) so they're recognized and spelled as written; saving applies from the next recording. Stored in `~/Library/Application Support/AFK/lexicon.txt`
 9. Menu → **Microphone**: System Default or a specific input; the choice persists and falls back to the default if that device is unplugged
 10. Menu → **History… (N)**: every transcript with time, target app, and length, newest first. Search, **Copy** (several at once), **Paste into Previous App**, **Delete** (or ⌫), and **Clear All…** (confirmed). Saved locally in `~/Library/Application Support/AFK/history.json` (mode 600); diagnostic self-tests aren't recorded
-11. Menu → **Settings…** (⌘,): paste your xAI API key (masked; saved to the user-only key file), **Test Key** checks speech-to-text and polish access separately and names the problem (incorrect key, no access, unknown model), and **Models (Advanced)** overrides the speech and polish model names. The menu shows ⚠️ when the key is missing or rejected
+11. Menu → **Settings…** (⌘,): choose a **provider and model** separately for speech-to-text and polish, paste API keys (masked, saved to user-only files), and **Test** both. The menu shows ⚠️ when a key is missing or rejected
+
+    | Provider | Speech-to-text | Polish | Key |
+    |---|---|---|---|
+    | **xAI Grok** (default) | streaming, live text | ✓ | `XAI_API_KEY_VOICE` |
+    | **OpenRouter** | one-shot (`/audio/transcriptions`), e.g. `fish-audio/transcribe-1`, `qwen/qwen3-asr-1.7b` | ✓ any chat model | `OPENROUTER_API_KEY` |
+    | **OpenAI** | one-shot, e.g. `gpt-4o-mini-transcribe` | ✓ | `OPENAI_API_KEY` |
+    | **Ollama** (local) | — | ✓ `http://localhost:11434/v1` | none |
+    | **Local Whisper** (whisper.cpp, local) | one-shot, `http://127.0.0.1:8178/v1` — run `scripts/local-whisper.sh [base\|small\|large-v3-turbo-q5_0]` to download a model from Hugging Face and start it | — | none |
+    | **Custom** OpenAI-compatible (LM Studio, local Whisper server, …) | one-shot | ✓ | optional |
+
+    Keys come from the environment variable when AFK is launched from a shell, otherwise from `~/Library/Application Support/AFK/<provider>-api-key`. Test reports incorrect keys, missing access, OpenRouter privacy-policy blocks, unknown models, and local servers that aren't running. OpenAI (direct) is implemented but untested here. Whisper output is cleaned (non-speech tags like `[BLANK_AUDIO]` dropped, Traditional Chinese converted to Simplified). With Local Whisper + Ollama, nothing leaves the Mac; AFK preloads the Ollama model when recording starts.
 12. Menu → **Copy Last Transcript** if a paste went to the wrong place; **Paste test string** checks pasting without the mic
 13. Menu → **Enabled** toggles the listener
 

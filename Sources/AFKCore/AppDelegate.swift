@@ -39,7 +39,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
     private var pressStartedAt: Date?
     /// The release after a press that ended hands-free recording must not start anything.
     private var ignoreNextRelease = false
-    private var session: GrokSttSession?
+    private var session: SpeechSession?
     /// Why the current press can't record (missing key or microphone access).
     private var captureProblem: String?
     private var pauseDetector: PauseDetector?
@@ -80,7 +80,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
-        if ApiKeyStore.load() == nil { setApiProblem("No xAI API key — open Settings…") }
+        if case let .failure(problem) = Endpoint.current(for: .speech) { setApiProblem(problem.localizedDescription) }
         promptAccessibilityIfNeeded()
 
         keyMonitor.onHotkeyDown = { [weak self] in self?.hotkeyDown() }
@@ -231,11 +231,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
 
     /// Starts mic capture and a streaming session; returns a user-facing reason if it can't.
     private func startCapture(_ kind: Capture, at start: Date) -> String? {
-        guard let (apiKey, keySource) = ApiKeyStore.load() else {
-            setApiProblem("No xAI API key — open Settings…")
-            return "No xAI API key — open AFK → Settings… to add one"
+        let endpoint: Endpoint
+        switch Endpoint.current(for: .speech) {
+        case let .success(e):
+            endpoint = e
+        case let .failure(problem):
+            setApiProblem(problem.localizedDescription)
+            return problem.localizedDescription
         }
-        sttLog.info("using API key from \(keySource.rawValue, privacy: .public)")
+        sttLog.info("speech via \(endpoint.provider.displayName, privacy: .public) \(endpoint.model, privacy: .public)")
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
             break
@@ -246,9 +250,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
             return "Microphone is off for AFK — System Settings → Privacy & Security → Microphone"
         }
 
-        var sttConfig = GrokSttConfig(apiKey: apiKey, keyterms: lexicon.keyTermsForStt)
-        sttConfig.model = ModelSettings.speechModel()
-        let session = GrokSttSession(config: sttConfig)
+        let session: SpeechSession
+        if endpoint.provider == .xai {
+            var sttConfig = GrokSttConfig(apiKey: endpoint.apiKey ?? "", keyterms: lexicon.keyTermsForStt)
+            sttConfig.model = endpoint.model
+            session = GrokSttSession(config: sttConfig)
+        } else {
+            session = BatchSpeechSession(endpoint: endpoint, vocabulary: lexicon.keyTermsForStt)
+        }
         session.onPartial = { [weak self] text in
             guard let self else { return }
             self.overlay.updateTranscript(text)
@@ -269,6 +278,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         }
         self.session = session
         capture = kind
+        warmUpPolishModelIfLocal()
         captureIsSelfTest = selfTestStartingCapture
         captureStartedAt = start
         pauseDetector = PauseDetector(startedAt: start)
@@ -303,11 +313,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         )
     }
 
-    private func finishUtterance(_ session: GrokSttSession, paste: Bool, record: Bool, duration: TimeInterval?) {
+    private func finishUtterance(_ session: SpeechSession, paste: Bool, record: Bool, duration: TimeInterval?) {
         overlay.showTranscribing()
         let id = UUID()
         pendingResultID = id
-        session.finish { [weak self] result in
+        session.finish(timeout: 4) { [weak self] result in
             guard let self, self.pendingResultID == id else { return }
             self.pendingResultID = nil
             self.deliver(result, paste: paste, record: record, duration: duration)
@@ -356,12 +366,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
     }
 
     /// Recognizes key and model errors from speech-to-text, which need the user to act in Settings.
-    static func apiProblem(for error: Error) -> String? {
+    static func apiProblem(for error: Error, provider: Provider = ProviderSettings.provider(for: .speech)) -> String? {
         guard case let GrokSttError.http(status, body) = error else { return nil }
-        switch KeyCheck.from(status: status, body: Data(body.utf8), model: ModelSettings.speechModel(), seconds: 0) {
-        case .invalidKey: return "API key rejected"
-        case .noAccess: return "API key has no speech-to-text access"
-        case .modelNotFound: return "Speech model not found"
+        let model = ProviderSettings.model(for: .speech, provider: provider)
+        switch KeyCheck.from(status: status, body: Data(body.utf8), model: model, seconds: 0) {
+        case .invalidKey: return "\(provider.displayName) API key rejected"
+        case .noAccess: return "\(provider.displayName) key has no speech-to-text access"
+        case .modelNotFound: return "Speech model “\(model)” not found"
         default: return nil
         }
     }
@@ -382,6 +393,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
     }
 
     private func settingsSaved() {
+        warmUpPolishModelIfLocal()
         setApiProblem(nil)
         polishProblem = nil
         polishPausedUntil = nil
@@ -390,14 +402,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
     }
 
     private func polish(_ raw: String, paste: Bool, record: Bool, duration: TimeInterval?) {
-        guard let (apiKey, _) = ApiKeyStore.load() else {
-            finalize(raw, raw: nil, paste: paste, record: record, duration: duration)
+        guard case let .success(endpoint) = Endpoint.current(for: .polish) else {
+            finalize(raw, raw: nil, paste: paste, record: record, duration: duration,
+                     fallbackReason: "polish provider not set up (see Settings)")
             return
         }
         overlay.showPolishing()
         let id = UUID()
         pendingResultID = id
-        let config = PolishConfig(apiKey: apiKey, model: ModelSettings.polishModel(), vocabulary: lexicon.keyTermsForStt)
+        let config = PolishConfig(endpoint: endpoint, vocabulary: lexicon.keyTermsForStt)
         Polisher.polish(raw, config: config) { [weak self] result in
             guard let self, self.pendingResultID == id else { return }
             self.pendingResultID = nil
@@ -417,6 +430,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
                               fallbackReason: "polish failed: \(reason)")
             }
         }
+    }
+
+    /// Local polish models take a while to load on first use; start that while the user talks.
+    private func warmUpPolishModelIfLocal() {
+        guard settings.outputStyle == .polished, case let .success(endpoint) = Endpoint.current(for: .polish),
+              endpoint.provider.hasEditableBaseURL else { return }
+        Polisher.warmUp(endpoint)
     }
 
     /// Records the transcript in history and pastes (or shows) it. `fallbackReason` explains

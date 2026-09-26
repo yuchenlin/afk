@@ -11,18 +11,25 @@ public enum OutputStyle: String, CaseIterable, Sendable {
 }
 
 public struct PolishConfig: Sendable {
-    public var apiKey: String
-    public var model: String
+    public var endpoint: Endpoint
     public var vocabulary: [String]
-    public var timeout: TimeInterval = 4
+    /// Cloud models answer in ~1 s; local ones may first need to load into memory.
+    public var timeout: TimeInterval
 
-    /// Override with `defaults write xyz.yuchenlin.afk polishModel <model>`.
-    public static let defaultModel = "grok-4-1-fast-non-reasoning"
+    public static var defaultModel: String { Provider.xai.defaultModel(for: .polish) }
 
-    public init(apiKey: String, model: String = PolishConfig.defaultModel, vocabulary: [String] = []) {
-        self.apiKey = apiKey
-        self.model = model
+    public var apiKey: String { endpoint.apiKey ?? "" }
+    public var model: String { endpoint.model }
+
+    public init(endpoint: Endpoint, vocabulary: [String] = []) {
+        self.endpoint = endpoint
         self.vocabulary = vocabulary
+        self.timeout = endpoint.provider.hasEditableBaseURL ? 15 : 4
+    }
+
+    /// xAI with the given key (used by tests and older call sites).
+    public init(apiKey: String, model: String = PolishConfig.defaultModel, vocabulary: [String] = []) {
+        self.init(endpoint: Endpoint(provider: .xai, apiKey: apiKey, model: model), vocabulary: vocabulary)
     }
 }
 
@@ -35,7 +42,7 @@ public enum PolishError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .permissionDenied: return "API key lacks chat access"
-        case let .http(code, body): return "HTTP \(code): \(body.prefix(160))"
+        case let .http(code, body): return "HTTP \(code): \(APIErrorBody.message(from: Data(body.utf8)).prefix(160))"
         case .badResponse: return "unexpected response"
         case .rejected: return "result didn't look like a cleanup"
         }
@@ -91,22 +98,52 @@ public enum Polisher {
     }
 
     public static func request(text: String, config: PolishConfig) -> URLRequest {
-        var request = URLRequest(url: URL(string: "https://api.x.ai/v1/chat/completions")!)
-        request.httpMethod = "POST"
-        request.timeoutInterval = config.timeout
-        request.setValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let body: [String: Any] = [
-            "model": config.model,
-            "temperature": 0,
-            "max_tokens": max(64, text.count * 2),
-            "messages": [
-                ["role": "system", "content": systemPrompt(vocabulary: relevantVocabulary(config.vocabulary, for: text))],
-                ["role": "user", "content": "<transcript>\n\(text)\n</transcript>"],
-            ],
+        let messages = [
+            ["role": "system", "content": systemPrompt(vocabulary: relevantVocabulary(config.vocabulary, for: text))],
+            ["role": "user", "content": "<transcript>\n\(text)\n</transcript>"],
         ]
+        return chatRequest(endpoint: config.endpoint, messages: messages, maxTokens: max(64, text.count * 2), timeout: config.timeout)
+    }
+
+    /// `POST {base}/chat/completions` in the OpenAI format that xAI, OpenRouter, OpenAI,
+    /// Ollama and most local servers accept.
+    public static func chatRequest(endpoint: Endpoint, messages: [[String: String]], maxTokens: Int, timeout: TimeInterval) -> URLRequest {
+        var request = URLRequest(url: endpoint.url("/chat/completions") ?? URL(string: "about:blank")!)
+        request.httpMethod = "POST"
+        request.timeoutInterval = timeout
+        endpoint.authorize(&request)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = ["model": endpoint.model, "messages": messages]
+        if endpoint.provider == .openai {
+            // OpenAI's current models reject `max_tokens`, and reasoning models reject a custom temperature.
+            body["max_completion_tokens"] = maxTokens
+            if !isOpenAIReasoningModel(endpoint.model) { body["temperature"] = 0 }
+        } else {
+            body["max_tokens"] = maxTokens
+            body["temperature"] = 0
+        }
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         return request
+    }
+
+    /// Loads a local model into memory ahead of time (a 1-token request), so the first real
+    /// cleanup doesn't wait for the load, which can take 15+ seconds. Only for local servers:
+    /// they abort a load when the request that started it is cancelled, so a short timeout
+    /// on the real request would otherwise never let the model finish loading.
+    public static func warmUp(_ endpoint: Endpoint, urlSession: URLSession = .shared) {
+        guard endpoint.provider.hasEditableBaseURL else { return }
+        let request = chatRequest(endpoint: endpoint, messages: [["role": "user", "content": "ok"]], maxTokens: 1, timeout: 120)
+        let started = Date()
+        urlSession.dataTask(with: request) { _, response, error in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let seconds = Date().timeIntervalSince(started)
+            polishLog.info("warm-up \(endpoint.model, privacy: .public): HTTP \(status, privacy: .public) in \(seconds, privacy: .public)s\(error.map { " — \($0.localizedDescription)" } ?? "", privacy: .public)")
+        }.resume()
+    }
+
+    static func isOpenAIReasoningModel(_ model: String) -> Bool {
+        let m = model.lowercased()
+        return m.hasPrefix("o1") || m.hasPrefix("o3") || m.hasPrefix("o4") || m.hasPrefix("gpt-5")
     }
 
     /// Very short utterances rarely need cleanup and aren't worth the extra round trip.

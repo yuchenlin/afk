@@ -58,8 +58,9 @@ final class SettingsTests: XCTestCase {
 
     @MainActor
     func testTranscriptionErrorsThatNeedSettings() {
-        XCTAssertEqual(AppDelegate.apiProblem(for: GrokSttError.http(400, #"{"error":"Incorrect API key provided."}"#)), "API key rejected")
-        XCTAssertEqual(AppDelegate.apiProblem(for: GrokSttError.http(403, #"{"error":"API key is currently blocked"}"#)), "API key has no speech-to-text access")
+        XCTAssertEqual(AppDelegate.apiProblem(for: GrokSttError.http(400, #"{"error":"Incorrect API key provided."}"#), provider: .xai), "xAI Grok API key rejected")
+        XCTAssertEqual(AppDelegate.apiProblem(for: GrokSttError.http(403, #"{"error":"API key is currently blocked"}"#), provider: .xai), "xAI Grok key has no speech-to-text access")
+        XCTAssertEqual(AppDelegate.apiProblem(for: GrokSttError.http(401, #"{"error":{"message":"Missing Authentication header"}}"#), provider: .openrouter), "OpenRouter API key rejected")
         XCTAssertNil(AppDelegate.apiProblem(for: GrokSttError.http(503, "busy")))
         XCTAssertNil(AppDelegate.apiProblem(for: URLError(.notConnectedToInternet)))
     }
