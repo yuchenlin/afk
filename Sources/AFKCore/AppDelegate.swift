@@ -30,8 +30,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         case hold
         /// Ends on the next shortcut press, Esc (cancel), or auto-stop.
         case handsFree
-        /// Menu "Test Transcription": fixed 3 s, shows text instead of pasting.
-        case test
     }
 
     private var enabled = true
@@ -305,9 +303,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         return nil
     }
 
-    /// Ends the current recording; `finish` transcribes and pastes (or shows, for the test).
+    /// Ends the current recording; `finish` transcribes and pastes (unless a CLI self-test).
     private func stopCapture(finish: Bool) {
-        guard let kind = capture else { return }
+        guard capture != nil else { return }
         capture = nil
         pauseTimer?.invalidate()
         pauseTimer = nil
@@ -324,7 +322,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         let duration = captureStartedAt.map { Date().timeIntervalSince($0) }
         finishUtterance(
             session,
-            paste: kind != .test && !captureIsSelfTest,
+            paste: !captureIsSelfTest,
             record: !captureIsSelfTest,
             duration: duration
         )
@@ -491,9 +489,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
 
     /// `open AFK.app --args <option>` drives the same code paths as the shortcut, without
     /// pasting, so the talk flow can be checked end to end without sending key presses:
-    /// `--self-test` (menu Test Transcription), `--self-test-handsfree` (tap, 3 s, tap),
-    /// `--self-test-cancel` (tap, 1.5 s, Esc), `--self-test-hold` (hold 2 s, release),
-    /// `--self-test-autostop` (tap once; relies on auto-stop), `--self-test-polish [text]`.
+    /// `--self-test-handsfree` (tap, 3 s, tap), `--self-test-cancel` (tap, 1.5 s, Esc),
+    /// `--self-test-hold` (hold 2 s, release), `--self-test-autostop` (tap once; relies on
+    /// auto-stop), `--self-test-polish [text]`.
     private func runSelfTestIfRequested() {
         let args = CommandLine.arguments
         let after: (TimeInterval, @escaping @MainActor () -> Void) -> Void = { delay, action in
@@ -517,10 +515,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         }
         if args.contains("--open-vocabulary") {
             after(0.5) { [weak self] in self?.openVocabulary(nil) }
-            return
-        }
-        if args.contains("--self-test") {
-            after(1) { [weak self] in self?.testTranscription(nil) }
             return
         }
         let flows: [String: [(TimeInterval, (AppDelegate) -> Void)]] = [
@@ -661,14 +655,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
 
         menu.addItem(NSMenuItem.separator())
 
-        let testItem = NSMenuItem(
-            title: "Test Transcription (3 s)",
-            action: #selector(testTranscription(_:)),
-            keyEquivalent: ""
-        )
-        testItem.target = self
-        menu.addItem(testItem)
-
         historyItem = NSMenuItem(title: "History…", action: #selector(openHistory(_:)), keyEquivalent: "")
         historyItem.target = self
         menu.addItem(historyItem)
@@ -680,14 +666,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         )
         copyLastItem.target = self
         menu.addItem(copyLastItem)
-
-        let test = NSMenuItem(
-            title: "Paste test string",
-            action: #selector(pasteTest(_:)),
-            keyEquivalent: ""
-        )
-        test.target = self
-        menu.addItem(test)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -980,27 +958,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         openAccessibilityPane()
     }
 
-    /// Records 3 s and shows the transcript in the pill without pasting.
-    @objc private func testTranscription(_ sender: NSMenuItem?) {
-        guard capture == nil, pendingResultID == nil else { return }
-        if let problem = startCapture(.test, at: Date()) {
-            overlay.showNotice(problem, symbol: "exclamationmark.triangle.fill", autoHideAfter: 4)
-            return
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-            guard let self, self.capture == .test else { return }
-            self.stopCapture(finish: true)
-        }
-    }
-
     @objc private func copyLastTranscript(_ sender: NSMenuItem) {
         guard let text = history.entries.first?.text else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
-    }
-
-    @objc private func pasteTest(_ sender: NSMenuItem) {
-        injector.paste("AFK test paste — cursor insert OK.")
     }
 
     public func menuNeedsUpdate(_ menu: NSMenu) {

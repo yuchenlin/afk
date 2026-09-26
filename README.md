@@ -48,7 +48,7 @@ The API key is `XAI_API_KEY_VOICE`, read from the environment or `~/Library/Appl
     | **Custom** OpenAI-compatible (LM Studio, local Whisper server, …) | one-shot | ✓ | optional |
 
     Keys come from the environment variable when AFK is launched from a shell, otherwise from `~/Library/Application Support/AFK/<provider>-api-key`. Test reports incorrect keys, missing access, OpenRouter privacy-policy blocks, unknown models, and local servers that aren't running. OpenAI (direct) is implemented but untested here. Whisper output is cleaned (non-speech tags like `[BLANK_AUDIO]` dropped, Traditional Chinese converted to Simplified). With Local Whisper + Ollama, nothing leaves the Mac; AFK preloads the Ollama model when recording starts.
-12. Menu → **Copy Last Transcript** if a paste went to the wrong place; **Paste test string** checks pasting without the mic
+12. Menu → **Copy Last Transcript** if a paste went to the wrong place
 13. Menu → **Enabled** toggles the listener
 
 ## Layout
