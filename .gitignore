@@ -13,7 +13,10 @@ DerivedData/
 .env.*
 !.env.example
 **/Secrets.plist
-**/APIKey*
+# Key *values* / secret plists — not Sources/.../ApiKeyStore.swift
+**/APIKey.plist
+**/APIKeys.plist
+**/*-api-key
 # Audio / eval artifacts
 eval/recordings/
 *.wav
