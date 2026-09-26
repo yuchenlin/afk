@@ -18,7 +18,7 @@ public enum SpeechPipelineError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .noAPIKey: return "Add an xAI API key in Settings (or enable Mock STT)."
+        case .noAPIKey: return "Add an xAI API key in Settings to use live STT (or enable Mock STT for offline)."
         case .emptyAudio: return "Recording was too short."
         case let .http(code, body): return "HTTP \(code): \(body.prefix(200))"
         case .badResponse: return "Unexpected API response"

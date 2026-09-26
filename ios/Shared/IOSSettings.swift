@@ -12,7 +12,7 @@ public struct IOSSettings: Sendable {
         speechModel: AppGroupConstants.defaultSpeechModel,
         polishModel: AppGroupConstants.defaultPolishModel,
         sessionMinutes: AppGroupConstants.defaultSessionMinutes,
-        useMockSTT: true,
+        useMockSTT: false,
         polishEnabled: true
     )
 
@@ -31,6 +31,12 @@ public struct IOSSettings: Sendable {
         }
         if defaults.object(forKey: AppGroupConstants.settingsPolishEnabledKey) != nil {
             s.polishEnabled = defaults.bool(forKey: AppGroupConstants.settingsPolishEnabledKey)
+        }
+        // A saved xAI key always wins: never leave mock sticky ON (App Group may still
+        // have true from older builds that defaulted mock on).
+        if KeychainStore.readAPIKey() != nil, s.useMockSTT {
+            s.useMockSTT = false
+            s.save(to: defaults)
         }
         return s
     }

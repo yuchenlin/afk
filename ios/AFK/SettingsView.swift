@@ -14,7 +14,7 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Defaults match Mac (`grok-voice-transcribe-2.0` / `grok-4-1-fast-non-reasoning`). Turn off Mock STT to use your xAI key.")
+                    Text("Defaults match Mac (`grok-voice-transcribe-2.0` / `grok-4-1-fast-non-reasoning`). Mock STT is off when an xAI key is saved — live Grok is used instead.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

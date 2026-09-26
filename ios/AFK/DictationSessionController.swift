@@ -152,16 +152,24 @@ final class DictationSessionController: ObservableObject {
         relay.statusMessage = status
 
         do {
-            let settings = self.settings
+            // Reload so Keychain / App Group migrations apply even if Settings sheet wasn't opened.
+            let settings = IOSSettings.load()
+            self.settings = settings
             let apiKey = KeychainStore.readAPIKey()
-            let speech: SpeechTranscribing = settings.useMockSTT ? mock : grok
+            // Key present → always live Grok (never Chinese mock). Mock only when
+            // explicitly enabled AND no key. Missing key + mock off → clear error.
+            let useMock = settings.useMockSTT && apiKey == nil
+            if apiKey == nil, !useMock {
+                throw SpeechPipelineError.noAPIKey
+            }
+            let speech: SpeechTranscribing = useMock ? mock : grok
             var text = try await speech.transcribe(
                 pcm16: pcm,
                 sampleRate: AudioCapture.sampleRate,
                 model: settings.speechModel,
                 apiKey: apiKey
             )
-            if settings.polishEnabled, !settings.useMockSTT, apiKey != nil {
+            if settings.polishEnabled, !useMock, apiKey != nil {
                 status = "Polishing…"
                 relay.statusMessage = status
                 let polish: TextPolishing = polisher
@@ -169,7 +177,7 @@ final class DictationSessionController: ObservableObject {
                    !polished.isEmpty {
                     text = polished
                 }
-            } else if settings.polishEnabled, settings.useMockSTT {
+            } else if settings.polishEnabled, useMock {
                 text = (try? await mock.polish(text, model: settings.polishModel, apiKey: nil)) ?? text
             }
             lastTranscript = text

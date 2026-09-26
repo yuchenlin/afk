@@ -39,7 +39,7 @@ Or open `AFK-iOS.xcodeproj` directly if already generated.
 5. On device: Settings → General → Keyboard → Keyboards → Add **AFK** → enable **Allow Full Access**.
 6. In the AFK app: grant mic → **Start dictation session** → record, or switch to AFK Keyboard and tap 🎤.
 
-Mock STT is **on by default** so the host → App Group → keyboard path works without an API key. Turn it off in Settings and paste an xAI key for real `grok-voice-transcribe-2.0` batch STT.
+Mock STT is **off by default**. Paste an xAI key in Settings for live `grok-voice-transcribe-2.0` batch STT. With a key saved, the session path always uses Grok (never the Chinese mock string). Enable Mock STT only for offline / no-key smoke tests.
 
 ## What works vs stubs
 
