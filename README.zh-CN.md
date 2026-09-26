@@ -24,20 +24,20 @@
 
 ## 下载与安装（Mac）
 
-### 1. 推荐：GitHub Releases DMG *（随首次 Release 推出）*
+### 1. 推荐：GitHub Releases DMG
 
-发布经公证（notarized）的构建后，请从 [GitHub Releases](https://github.com/yuchenlin/afk/releases) 下载 **`AFK-*.dmg`**，打开磁盘映像，将 **AFK.app** 拖入 **应用程序**。
+从 [GitHub Releases](https://github.com/yuchenlin/afk/releases/tag/v0.1.0) 下载 **[AFK-0.1.0.dmg](https://github.com/yuchenlin/afk/releases/download/v0.1.0/AFK-0.1.0.dmg)**（Developer ID 签名、Apple 公证并已装订）。打开磁盘映像，将 **AFK.app** 拖入 **应用程序**。
 
-在该资源出现之前，请使用下方的**从源码构建**。本地已支持打包 DMG（`make dmg` → `dist/AFK-VERSION.dmg`）；要给陌生人无摩擦安装，仍需 Apple **Developer ID** + 公证 — 详见 [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)（英文）。
+后续版本见 [全部 Releases](https://github.com/yuchenlin/afk/releases)。自行打包：`make dmg` → `dist/AFK-VERSION.dmg` — 详见 [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)（英文）。
 
-#### Gatekeeper（未签名 / 未公证 / 仅 Apple Development）
+#### Gatekeeper（源码 / Apple Development / 未公证构建）
 
-macOS 可能提示无法打开，因为「无法检查是否包含恶意软件」。在提供 Developer ID 公证的 Release 之前，这是预期行为。可以这样打开：
+**Release DMG** 一般可直接打开。若从源码构建或仅用 Apple Development / 临时签名，macOS 可能提示无法打开（无法检查是否包含恶意软件）。可以这样打开：
 
 1. **右键**（或 Control-单击）**AFK.app** → **打开** → 再点 **打开**，或
 2. **系统设置 → 隐私与安全性** → 找到有关 AFK 的提示 → **仍要打开**，然后确认。
 
-**如实说明：** 要让其他人的 Mac 双击即可安装，需要加入 [Apple Developer Program](https://developer.apple.com/programs/)、**Developer ID Application** 证书、`notarytool` 公证并装订（staple）。在 Xcode → Settings → Accounts 登录（得到 Apple Development）**并不等于**已创建 Developer ID 证书。Apple Development 或本地的 `make dev-cert` 只适合在*你自己的* Mac 上保持辅助功能/麦克风授权跨重建有效 — **不能**让其他机器的 Gatekeeper 放行。清单见 [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)。
+**说明：** 要让其他人的 Mac 双击即可安装，需要 [Apple Developer Program](https://developer.apple.com/programs/)、**Developer ID Application** 证书、`notarytool` 公证并装订。Apple Development 或 `make dev-cert` 只适合在*你自己的* Mac 上保持辅助功能/麦克风授权。清单见 [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)。
 
 ### 2. 从源码构建
 
@@ -186,4 +186,4 @@ Logo 为 `design/logo/afk-logo-dark.svg`（及 `-light`）：两只眼睛上方�
 3. ~~词汇表 + 轻度润色~~
 4. 中英混合评测 vs Fun-ASR
 5. iOS 键盘中继
-6. 经公证的 GitHub Releases DMG（Developer ID）
+6. ~~经公证的 GitHub Releases DMG（Developer ID）~~

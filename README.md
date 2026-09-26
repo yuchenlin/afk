@@ -24,20 +24,20 @@ See [docs/PRIOR_ART.md](docs/PRIOR_ART.md). Fn + paste adapted from [Scribe](htt
 
 ## Download & install (Mac)
 
-### 1. Preferred: GitHub Releases DMG *(coming with the first Release)*
+### 1. Preferred: GitHub Releases DMG
 
-When a notarized build is published, download **`AFK-*.dmg`** from [GitHub Releases](https://github.com/yuchenlin/afk/releases), open the disk image, and drag **AFK.app** into **Applications**.
+Download **[AFK-0.1.0.dmg](https://github.com/yuchenlin/afk/releases/download/v0.1.0/AFK-0.1.0.dmg)** from [GitHub Releases](https://github.com/yuchenlin/afk/releases/tag/v0.1.0) (Developer ID signed, Apple notarized, stapled). Open the disk image and drag **AFK.app** into **Applications**.
 
-Until that asset exists, use **build from source** below. Packaging a DMG locally is already supported (`make dmg` → `dist/AFK-VERSION.dmg`); shipping it to strangers still needs Apple **Developer ID** + notarization — see [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
+Later versions: [all Releases](https://github.com/yuchenlin/afk/releases). To package a DMG yourself: `make dmg` → `dist/AFK-VERSION.dmg` — see [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
 
-#### Gatekeeper (unsigned / unnotarized / Apple Development builds)
+#### Gatekeeper (source / Apple Development / unnotarized builds)
 
-macOS may say AFK “can’t be opened because Apple cannot check it for malicious software.” That is expected until a Developer ID–notarized Release exists. To open anyway:
+The **Release DMG** should open normally. If you built from source or used Apple Development / ad-hoc signing, macOS may say AFK “can’t be opened because Apple cannot check it for malicious software.” To open anyway:
 
 1. **Right-click** (Control-click) **AFK.app** → **Open** → **Open**, or
 2. **System Settings → Privacy & Security** → find the AFK message → **Open Anyway**, then confirm.
 
-**Honest note:** a frictionless double-click install for other people’s Macs requires an [Apple Developer Program](https://developer.apple.com/programs/) enrollment, a **Developer ID Application** certificate, `notarytool` notarization, and stapling. Signing into Xcode → Settings → Accounts (Apple Development) is **not** the same as creating a Developer ID cert. Apple Development or the local `make dev-cert` identity only helps *your* Mac keep Accessibility/Microphone grants across rebuilds — it does **not** satisfy Gatekeeper elsewhere. Details and a checklist: [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
+**Note:** frictionless install for other Macs needs [Apple Developer Program](https://developer.apple.com/programs/), a **Developer ID Application** certificate, `notarytool` notarization, and stapling. Apple Development or `make dev-cert` only helps *your* Mac keep Accessibility/Microphone grants across rebuilds. Checklist: [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
 
 ### 2. Build from source
 
@@ -186,4 +186,4 @@ The logo is `design/logo/afk-logo-dark.svg` (and `-light`): two eyes above a sou
 3. ~~Lexicon + light polish~~
 4. zh–en mix eval vs Fun-ASR
 5. iOS keyboard relay
-6. Notarized GitHub Releases DMG (Developer ID)
+6. ~~Notarized GitHub Releases DMG (Developer ID)~~
