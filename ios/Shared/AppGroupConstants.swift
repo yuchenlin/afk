@@ -5,8 +5,13 @@ import Foundation
 /// **Setup:** In Xcode, set your Team on both targets and ensure the App Group
 /// capability uses this exact id (or update every reference if you change it).
 public enum AppGroupConstants {
-    /// Placeholder App Group — must match entitlements on both targets.
+    /// Must match entitlements on both targets.
     public static let suiteName = "group.xyz.yuchenlin.afk"
+
+    /// Keychain access group (TeamID prefix applied at runtime / via entitlements).
+    public static let keychainAccessGroupSuffix = "xyz.yuchenlin.afk.shared"
+    /// Team 6FQUWPKXD8 — must match DEVELOPMENT_TEAM / entitlements AppIdentifierPrefix.
+    public static let keychainAccessGroup = "6FQUWPKXD8.xyz.yuchenlin.afk.shared"
 
     public static let hostBundleID = "xyz.yuchenlin.afk.ios"
     public static let keyboardBundleID = "xyz.yuchenlin.afk.ios.keyboard"
@@ -25,12 +30,21 @@ public enum AppGroupConstants {
     public static let settingsUseMockSTTKey = "settings.useMockSTT"
     public static let settingsPolishEnabledKey = "settings.polishEnabled"
 
+    // Full Access handshake (host writes challenge; keyboard with Full Access echoes)
+    public static let fullAccessHostChallengeKey = "fullAccess.hostChallenge"
+    public static let fullAccessHostChallengeAtKey = "fullAccess.hostChallengeAt"
+    public static let fullAccessKeyboardEchoKey = "fullAccess.keyboardEcho"
+    public static let fullAccessKeyboardReportedKey = "fullAccess.keyboardReported"
+    public static let fullAccessKeyboardReportedAtKey = "fullAccess.keyboardReportedAt"
+    public static let fullAccessProbeKey = "fullAccess.rwProbe"
+
     // Darwin notification names (CFNotificationCenter distributed)
     public static let noteStartRecording = "xyz.yuchenlin.afk.ios.startRecording"
     public static let noteStopRecording = "xyz.yuchenlin.afk.ios.stopRecording"
     public static let noteResultReady = "xyz.yuchenlin.afk.ios.resultReady"
     public static let noteSessionChanged = "xyz.yuchenlin.afk.ios.sessionChanged"
     public static let noteOpenHost = "xyz.yuchenlin.afk.ios.openHost"
+    public static let noteFullAccessChanged = "xyz.yuchenlin.afk.ios.fullAccessChanged"
 
     public static let defaultSpeechModel = "grok-voice-transcribe-2.0"
     public static let defaultPolishModel = "grok-4-1-fast-non-reasoning"

@@ -8,7 +8,7 @@ public final class MockSpeechProvider: SpeechTranscribing, TextPolishing, @unche
         try await Task.sleep(nanoseconds: 400_000_000)
         let seconds = Double(pcm16.count) / Double(max(sampleRate, 1) * 2)
         return String(
-            format: "[WIP mock STT · %.1fs · %@] Hello from AFK iOS — 你好，这是模拟转写。",
+            format: "[mock STT · %.1fs · %@] Hello from AFK iOS — 你好，这是模拟转写。",
             seconds,
             model
         )

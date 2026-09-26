@@ -96,7 +96,7 @@ final class DictationSessionController: ObservableObject {
         }
 
         if !restartTimerOnly {
-            // Soft keepalive beep is intentionally omitted (WIP).
+            // Soft keepalive beep intentionally omitted.
         }
     }
 

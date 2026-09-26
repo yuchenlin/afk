@@ -4,12 +4,14 @@ import UIKit
 struct OnboardingView: View {
     @Binding var isPresented: Bool
     @EnvironmentObject private var session: DictationSessionController
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var fullAccessStatus: FullAccessProbe.HostStatus = FullAccessProbe.hostStatus()
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    Text("AFK Keyboard (WIP) needs the host app for microphone access. Custom keyboards cannot open the mic — even with Full Access.")
+                    Text("AFK Keyboard needs the host app for microphone access. Custom keyboards cannot open the mic — even with Full Access.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -28,17 +30,27 @@ struct OnboardingView: View {
                     Text("Settings → General → Keyboard → Keyboards → Add New Keyboard… → AFK")
                         .font(.footnote)
                     Button("Open Keyboard Settings") {
-                        openSettings("App-Prefs:root=General&path=Keyboard")
+                        openSettings()
                     }
                 }
 
                 Section("3. Full Access") {
-                    Text("In Keyboards → AFK → allow Full Access so the extension can use the App Group relay. Typing works without it; dictation does not.")
+                    Label {
+                        Text(fullAccessStatus.label)
+                    } icon: {
+                        Image(systemName: fullAccessStatus.isOK ? "checkmark.circle.fill" : "exclamationmark.circle")
+                            .foregroundStyle(fullAccessStatus.isOK ? .green : .orange)
+                    }
+                    Text("In Keyboards → AFK → allow Full Access so the extension can use the App Group relay. Typing works without it; dictation does not. After enabling, switch to the AFK Keyboard once so Setup can confirm.")
                         .font(.footnote)
                     Button("Open AFK Settings") {
                         if let url = URL(string: UIApplication.openSettingsURLString) {
                             UIApplication.shared.open(url)
                         }
+                    }
+                    Button("Recheck Full Access") {
+                        FullAccessProbe.publishHostChallenge()
+                        refreshFullAccess()
                     }
                 }
 
@@ -56,11 +68,23 @@ struct OnboardingView: View {
                     }
                 }
             }
+            .onAppear {
+                FullAccessProbe.publishHostChallenge()
+                refreshFullAccess()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    refreshFullAccess()
+                }
+            }
         }
     }
 
-    private func openSettings(_ deepLink: String) {
-        // Deep links into Settings sub-panes are best-effort / often ignored on modern iOS.
+    private func refreshFullAccess() {
+        fullAccessStatus = FullAccessProbe.hostStatus()
+    }
+
+    private func openSettings() {
         if let url = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(url)
         }

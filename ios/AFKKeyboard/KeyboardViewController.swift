@@ -1,13 +1,13 @@
 import UIKit
 
-/// AFK Keyboard (WIP): basic QWERTY + mic that relays to the host via App Group / Darwin.
+/// AFK Keyboard: basic QWERTY + mic that relays to the host via App Group / Darwin.
 final class KeyboardViewController: UIInputViewController {
-    private let relay = SessionRelay.shared
     private var keyboardView: KeyboardView!
-    private var resultObserver: NSObjectProtocol?
-    private var sessionObserver: NSObjectProtocol?
+    private let relay = SessionRelay.shared
     private var shiftOn = false
     private var needsFullAccessBanner = false
+    private var resultObserver: NSObjectProtocol?
+    private var sessionObserver: NSObjectProtocol?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -25,6 +25,7 @@ final class KeyboardViewController: UIInputViewController {
             kv.heightAnchor.constraint(greaterThanOrEqualToConstant: 260),
         ])
         keyboardView = kv
+        refreshFullAccessState()
         refreshChrome()
 
         resultObserver = DarwinNotify.observe(AppGroupConstants.noteResultReady) { [weak self] in
@@ -42,14 +43,22 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        needsFullAccessBanner = !canUseAppGroup
+        refreshFullAccessState()
         refreshChrome()
         consumeResultIfNeeded()
     }
 
-    /// App Group suite only resolves when Full Access is on (and entitlement matches).
+    /// Prefer UIKit `hasFullAccess`, then App Group container + RW probe.
+    /// (Never use `UserDefaults(suiteName:) != nil` — that is always true.)
+    private func refreshFullAccessState() {
+        let allowed = hasFullAccess && FullAccessProbe.canOpenContainer
+        needsFullAccessBanner = !allowed
+        FullAccessProbe.reportFromKeyboard(hasFullAccess: allowed, defaults: relay.defaults)
+    }
+
     private var canUseAppGroup: Bool {
-        UserDefaults(suiteName: AppGroupConstants.suiteName) != nil
+        // needsFullAccessBanner already encodes hasFullAccess + App Group container.
+        !needsFullAccessBanner
     }
 
     private func refreshChrome() {
@@ -64,7 +73,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private func consumeResultIfNeeded() {
         guard canUseAppGroup, let result = relay.consumeResult() else {
-            if let err = relay.lastError {
+            if canUseAppGroup, let err = relay.lastError {
                 keyboardView.flash(err)
                 relay.clearError()
             }
@@ -111,7 +120,6 @@ extension KeyboardViewController: KeyboardViewDelegate {
         }
         if !relay.isSessionActive {
             keyboardView.flash("Open AFK → Start session")
-            // Keyboards cannot reliably open the host URL; user starts session in app.
             DarwinNotify.post(AppGroupConstants.noteOpenHost)
             return
         }
@@ -122,7 +130,6 @@ extension KeyboardViewController: KeyboardViewDelegate {
             DarwinNotify.post(AppGroupConstants.noteStartRecording)
             keyboardView.flash("Listening…")
         }
-        // Optimistic UI; host updates App Group.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             self?.refreshChrome()
         }

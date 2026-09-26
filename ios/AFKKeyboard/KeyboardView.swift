@@ -31,7 +31,7 @@ final class KeyboardView: UIView {
         super.init(frame: frame)
         backgroundColor = UIColor.systemGray5
 
-        titleLabel.text = "AFK Keyboard (WIP)"
+        titleLabel.text = "AFK Keyboard"
         titleLabel.font = .systemFont(ofSize: 11, weight: .semibold)
         titleLabel.textAlignment = .center
         titleLabel.textColor = .secondaryLabel

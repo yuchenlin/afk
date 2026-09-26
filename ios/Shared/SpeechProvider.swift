@@ -1,6 +1,6 @@
 import Foundation
 
-/// Pluggable STT for the iOS host. Real Grok client or mock for simulator/WIP.
+/// Pluggable STT for the iOS host. Real Grok client or mock for simulator / offline use.
 public protocol SpeechTranscribing: AnyObject {
     func transcribe(pcm16: Data, sampleRate: Int, model: String, apiKey: String?) async throws -> String
 }

@@ -1,4 +1,4 @@
-# AFK iOS (WIP)
+# AFK iOS
 
 > **Not App Store ready.** Scaffold for Typeless/Wispr-style dictation: the **host app** records + STT; the **keyboard extension** types + inserts via App Group.
 
@@ -8,7 +8,7 @@ Architecture and review constraints: [`docs/PLAN.md`](../docs/PLAN.md), [`docs/R
 
 ```
 AFK host (SwiftUI)                     AFK Keyboard (UIInputViewController)
-  mic + background audio session         basic QWERTY + 🌐 + 🎤 (WIP label)
+  mic + background audio session         basic QWERTY + 🌐 + 🎤
   Grok batch STT / mock + polish         signals start/stop via Darwin notify
   settings (Keychain API key)            insertText when result lands
         └──── App Group `group.xyz.yuchenlin.afk` ────┘

@@ -8,8 +8,6 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
-                wipBanner
-
                 Text(session.status)
                     .font(.headline)
                     .foregroundStyle(.secondary)
@@ -50,7 +48,7 @@ struct ContentView: View {
                 Spacer()
             }
             .padding(.top, 16)
-            .navigationTitle("AFK (WIP)")
+            .navigationTitle("AFK")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showSettings = true } label: {
@@ -70,15 +68,6 @@ struct ContentView: View {
                     .environmentObject(session)
             }
         }
-    }
-
-    private var wipBanner: some View {
-        Text("iOS WIP — not App Store ready. Host records; keyboard inserts.")
-            .font(.caption)
-            .foregroundStyle(.orange)
-            .padding(10)
-            .frame(maxWidth: .infinity)
-            .background(Color.orange.opacity(0.12))
     }
 
     private var sessionButton: some View {

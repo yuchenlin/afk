@@ -5,13 +5,22 @@ public final class SessionRelay {
     public static let shared = SessionRelay()
 
     public let defaults: UserDefaults
+    /// False when the App Group container is missing (entitlement / provisioning problem).
+    public let usesAppGroup: Bool
 
     public init(suiteName: String = AppGroupConstants.suiteName) {
-        if let d = UserDefaults(suiteName: suiteName) {
+        let containerOK = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: suiteName) != nil
+        if containerOK, let d = UserDefaults(suiteName: suiteName) {
             self.defaults = d
+            self.usesAppGroup = true
+        } else if let d = UserDefaults(suiteName: suiteName), containerOK == false {
+            // Keyboard without Full Access: suite object may exist but container is nil.
+            // Prefer the suite anyway so in-process state works; sharing with host will fail.
+            self.defaults = d
+            self.usesAppGroup = false
         } else {
-            // Simulator / unsigned builds may lack the App Group entitlement.
             self.defaults = .standard
+            self.usesAppGroup = false
         }
     }
 

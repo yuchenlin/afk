@@ -6,5 +6,9 @@
 	<array>
 		<string>group.xyz.yuchenlin.afk</string>
 	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)xyz.yuchenlin.afk.shared</string>
+	</array>
 </dict>
 </plist>
