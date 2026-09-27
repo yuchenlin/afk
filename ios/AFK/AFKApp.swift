@@ -13,7 +13,7 @@ struct AFKApp: App {
                     session.handleOpenURL(url)
                 }
                 .onChange(of: scenePhase) { _, phase in
-                    // Re-assert keepalive + heartbeat when returning to foreground mid-session.
+                    // Foreground is the only time iOS lets AFK (re)start the session mic.
                     if phase == .active {
                         session.noteBecameActive()
                     }

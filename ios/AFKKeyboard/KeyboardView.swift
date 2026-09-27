@@ -100,6 +100,7 @@ final class KeyboardView: UIView {
         level: Float,
         hostStatus: String,
         health: SessionRelay.HostHealth = .ready,
+        micLive: Bool = true,
         cta: HostCTA? = nil
     ) {
         waveform.level = recording ? level : 0
@@ -123,6 +124,12 @@ final class KeyboardView: UIView {
             styleMic(ready: false, recording: false)
             holdHint.text = "Open AFK to resume"
             applyCTA(cta ?? .sessionExpired)
+        } else if sessionOn, !micLive {
+            statusLabel.text = "iOS paused the AFK mic (call / Siri / audio change)"
+            statusLabel.textColor = .systemOrange
+            styleMic(ready: false, recording: false)
+            holdHint.text = "Open AFK once to resume"
+            applyCTA(cta ?? .recoverHost)
         } else if sessionOn, health == .degraded {
             let base = hostStatus.isEmpty ? "Session on · waking…" : hostStatus
             statusLabel.text = base

@@ -200,19 +200,29 @@ public final class SessionRelay {
         defaults.synchronize()
     }
 
-    /// Host: mark process as alive (called from session timer / keepalive).
-    /// `flush` forces the shared suite out so the keyboard process sees it at once;
-    /// the 1 Hz timer path leaves it off because the write is high-frequency.
-    public func touchHostHeartbeat(alive: Bool = true, flush: Bool = false) {
+    /// Host: mark process as alive (1 Hz background-queue heartbeat).
+    /// `micLive` = session mic engine is delivering buffers, so a keyboard start will work
+    /// without foregrounding the host. Posts `noteSessionChanged` only when it flips.
+    /// `flush` forces the shared suite out so the keyboard process sees it at once.
+    public func touchHostHeartbeat(alive: Bool = true, micLive: Bool, flush: Bool = false) {
+        let wasLive = defaults.bool(forKey: AppGroupConstants.hostMicLiveKey)
         defaults.set(alive, forKey: AppGroupConstants.hostAliveKey)
+        defaults.set(micLive, forKey: AppGroupConstants.hostMicLiveKey)
         defaults.set(Date().timeIntervalSince1970, forKey: AppGroupConstants.hostHeartbeatAtKey)
-        if flush { defaults.synchronize() }
+        if flush || wasLive != micLive { defaults.synchronize() }
+        if wasLive != micLive { DarwinNotify.post(AppGroupConstants.noteSessionChanged) }
     }
 
     public func clearHostHeartbeat() {
         defaults.set(false, forKey: AppGroupConstants.hostAliveKey)
+        defaults.set(false, forKey: AppGroupConstants.hostMicLiveKey)
         defaults.set(0.0, forKey: AppGroupConstants.hostHeartbeatAtKey)
         defaults.synchronize()
+    }
+
+    /// Keyboard: host's session mic engine is running (last heartbeat said so).
+    public var hostMicLive: Bool {
+        defaults.bool(forKey: AppGroupConstants.hostMicLiveKey)
     }
 
     /// Keyboard: true if host wrote a heartbeat within `maxAge` seconds.
@@ -240,26 +250,25 @@ public final class SessionRelay {
     }
 }
 
-/// In-keyboard call-to-action when the host session/keepalive is not ready.
+/// In-keyboard call-to-action when the host session mic is not ready.
 /// Mic never opens the host; only a deliberate tap on this CTA may.
 public enum HostCTA: Equatable {
+    /// No session yet.
     case startSession
+    /// Session flag set but host heartbeat is gone (suspended / killed).
     case sessionExpired
+    /// Host alive but iOS stopped its mic (call, Siri, route change) — needs foreground to restart.
     case recoverHost
 
     public var title: String {
         switch self {
         case .startSession: return "Open AFK once to start session"
-        case .sessionExpired: return "Session expired — open AFK"
-        case .recoverHost: return "Open AFK to fix mic"
+        case .sessionExpired: return "Session paused — open AFK once"
+        case .recoverHost: return "Mic paused by iOS — open AFK once"
         }
     }
 
-    public var urlPath: String {
-        switch self {
-        case .startSession: return AppGroupConstants.urlHostSession
-        case .sessionExpired, .recoverHost: return AppGroupConstants.urlHostWake
-        }
-    }
+    /// All CTAs (re)start the session mic in the foreground, then the user swipes back.
+    public var urlPath: String { AppGroupConstants.urlHostSession }
 }
 

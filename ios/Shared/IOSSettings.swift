@@ -4,16 +4,20 @@ import Foundation
 public struct IOSSettings: Sendable {
     public var speechModel: String
     public var polishModel: String
+    /// Idle minutes before the session mic turns off (reset by each dictation).
     public var sessionMinutes: Int
     public var useMockSTT: Bool
     public var polishEnabled: Bool
+    /// Start the session mic whenever AFK comes to the foreground.
+    public var autoStartSession: Bool
 
     public static let `default` = IOSSettings(
         speechModel: AppGroupConstants.defaultSpeechModel,
         polishModel: AppGroupConstants.defaultPolishModel,
         sessionMinutes: AppGroupConstants.defaultSessionMinutes,
         useMockSTT: false,
-        polishEnabled: true
+        polishEnabled: true,
+        autoStartSession: true
     )
 
     public static func load(from defaults: UserDefaults = SessionRelay.shared.defaults) -> IOSSettings {
@@ -32,6 +36,9 @@ public struct IOSSettings: Sendable {
         if defaults.object(forKey: AppGroupConstants.settingsPolishEnabledKey) != nil {
             s.polishEnabled = defaults.bool(forKey: AppGroupConstants.settingsPolishEnabledKey)
         }
+        if defaults.object(forKey: AppGroupConstants.settingsAutoStartSessionKey) != nil {
+            s.autoStartSession = defaults.bool(forKey: AppGroupConstants.settingsAutoStartSessionKey)
+        }
         // A saved xAI key always wins: never leave mock sticky ON (App Group may still
         // have true from older builds that defaulted mock on).
         if KeychainStore.readAPIKey() != nil, s.useMockSTT {
@@ -47,6 +54,7 @@ public struct IOSSettings: Sendable {
         defaults.set(sessionMinutes, forKey: AppGroupConstants.settingsSessionMinutesKey)
         defaults.set(useMockSTT, forKey: AppGroupConstants.settingsUseMockSTTKey)
         defaults.set(polishEnabled, forKey: AppGroupConstants.settingsPolishEnabledKey)
+        defaults.set(autoStartSession, forKey: AppGroupConstants.settingsAutoStartSessionKey)
         defaults.synchronize()
     }
 }

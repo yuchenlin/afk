@@ -54,7 +54,7 @@ struct OnboardingView: View {
                 }
 
                 Section("4. Start a session") {
-                    Text("Before dictating from the keyboard, tap “Start dictation session” in this app (orange mic indicator). Session length is configurable in Settings.")
+                    Text("Open AFK once (or tap “Open AFK once” in the keyboard). AFK starts a session and keeps the mic ready — the orange indicator stays on — so you can go back to any app and dictate from the AFK Keyboard without switching again. The session ends after the idle time set in Settings.")
                         .font(.footnote)
                 }
             }

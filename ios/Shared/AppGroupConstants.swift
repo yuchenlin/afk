@@ -30,6 +30,7 @@ public enum AppGroupConstants {
     public static let settingsSessionMinutesKey = "settings.sessionMinutes"
     public static let settingsUseMockSTTKey = "settings.useMockSTT"
     public static let settingsPolishEnabledKey = "settings.polishEnabled"
+    public static let settingsAutoStartSessionKey = "settings.autoStartSession"
 
     /// Keyboard → host command channel (survives missed Darwin notifies).
     /// Values: "" | "start" | "stop"
@@ -42,7 +43,8 @@ public enum AppGroupConstants {
     /// to detect a suspended/dead host even when session.active is still true.
     public static let hostHeartbeatAtKey = "host.heartbeatAt"
     public static let hostAliveKey = "host.alive"
-
+    /// Host mic engine is running and delivering buffers (hot mic). Written with the heartbeat.
+    public static let hostMicLiveKey = "host.micLive"
 
     // Full Access handshake (host writes challenge; keyboard with Full Access echoes)
     public static let fullAccessHostChallengeKey = "fullAccess.hostChallenge"
@@ -70,5 +72,6 @@ public enum AppGroupConstants {
 
     public static let defaultSpeechModel = "grok-voice-transcribe-2.0"
     public static let defaultPolishModel = "grok-4-1-fast-non-reasoning"
-    public static let defaultSessionMinutes = 15
+    /// Session ends after this many minutes without a dictation (reset on each use).
+    public static let defaultSessionMinutes = 30
 }

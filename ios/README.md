@@ -37,11 +37,13 @@ Or open `AFK-iOS.xcodeproj` directly if already generated.
    - Keyboard: `xyz.yuchenlin.afk.ios.keyboard`
 4. Run the **AFK** scheme on a simulator or device.
 5. On device: Settings → General → Keyboard → Keyboards → Add **AFK** → enable **Allow Full Access**.
-6. In the AFK app: grant mic → **Start dictation session** → switch to AFK Keyboard. Default UI is voice (hold mic to talk / release to send, or tap to toggle). Use **ABC** / **中文** for typing; **🌐** for the next system keyboard.
+6. Open the AFK app once: grant mic → the session starts automatically (or tap **Start dictation session**). The orange mic indicator stays on while the session is ready. Go back to any app and switch to AFK Keyboard. Default UI is voice (hold mic to talk / release to send, or tap to toggle). Use **ABC** / **中文** for typing; **🌐** for the next system keyboard.
 
-**Mic does nothing?** Usually the host was suspended or keepalive failed. Build 6 added a near-silent loop + heartbeat; **build 7** keeps the session **mixable** (`.mixWithOthers`) for both keepalive and capture so background reactivation no longer throws OSStatus `560557684` (`!int` = CannotInterruptOthers). Capture no longer switches to a non-mixable `.duckOthers` category.
+**How keyboard dictation stays in the current app (build 10, Wispr Flow / Typeless model).** iOS keeps a recording app running in the background under `UIBackgroundModes: audio`, but it refuses to *start* a mixable recording from the background (`AVAudioSession.ErrorCode.cannotStartRecording`, OSStatus 561145187 `!rec`). Builds ≤ 9 started `AVAudioEngine` on each keyboard tap — after the user left AFK that start failed on device (the simulator does not enforce the rule), so every dictation needed a trip back to AFK. Build 10 starts the mic engine **once, while AFK is foreground**, and keeps it running for the whole session ("hot mic"). Keyboard start/stop only arm/disarm which buffers are kept (0.4 s pre-roll), so no audio start ever happens in the background. A near-silent mixable loop runs beside it as a backup assertion.
 
-**The keyboard never jumps to AFK on its own.** As of **build 9** the mic talks to the host through the App Group alone — no `afk://` open, no foregrounding — so dictation stays in Messages/Notes/whatever you are typing in. The heartbeat is graded: `ready` (≤4 s) and `degraded` (≤10 s) both send the start command optimistically; `down` disables the mic and shows an **in-keyboard CTA button** ("Open AFK once to start session" / "Session expired — open AFK"). Tapping that button is the only path that opens `afk://`.
+The session ends after N minutes **without dictation** (Settings, default 30; each dictation resets it) or when you tap **End dictation session**. With **Start session when AFK opens** on (default), opening AFK is enough to start it.
+
+**The keyboard never jumps to AFK on its own.** The mic talks to the host through the App Group + Darwin notifications only. The host heartbeat (1 Hz, background queue) also publishes `host.micLive`. The keyboard disables the mic and shows an **in-keyboard button** when it cannot work: "Open AFK once to start session" (no session), "Session paused — open AFK once" (host heartbeat gone), or "Mic paused by iOS — open AFK once" (host alive but iOS stopped the mic — phone call, Siri, audio route change; restarting needs the foreground). Tapping that button is the only path that opens `afk://session`; AFK restarts the mic and shows a "tap ◀ to go back" hint.
 
 Mock STT is **off by default**. Paste an xAI key in Settings for live `grok-voice-transcribe-2.0` batch STT. With a key saved, the session path always uses Grok (never the Chinese mock string). Enable Mock STT only for offline / no-key smoke tests.
 
@@ -52,10 +54,10 @@ Mock STT is **off by default**. Paste an xAI key in Settings for live `grok-voic
 | Xcode project (app + keyboard) | ✅ |
 | Onboarding + Settings (models, session length, Keychain) | ✅ |
 | Host record → mock / Grok batch STT → App Group | ✅ (streaming STT deferred) |
-| Background audio session keepalive | ✅ near-silent mixable loop + host heartbeat (`UIBackgroundModes: audio`) |
+| Background dictation session | ✅ session-long mic engine started in foreground (hot mic) + backup near-silent loop + 1 Hz heartbeat with `micLive` (`UIBackgroundModes: audio`) |
 | Keyboard voice-first + ABC/中文 typing + globe | ✅ Typeless-like |
 | Mic hold/tap → App Group command + Darwin → insertText | ✅ App Group only; never opens `afk://` |
-| Host unreachable → in-keyboard "Open AFK once" CTA | ✅ only deliberate tap opens `afk://` |
+| Host unreachable / mic paused → in-keyboard "Open AFK once" CTA | ✅ only deliberate tap opens `afk://session` |
 | Full Mac Polisher / lexicon / streaming Grok | ❌ stub / simplified |
 | Live Activity / Control Center / iCloud | ❌ TODO |
 | App Store assets / consent / privacy policy | ❌ not claimed |

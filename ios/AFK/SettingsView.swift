@@ -60,13 +60,18 @@ struct SettingsView: View {
                         .autocorrectionDisabled()
                 }
 
-                Section("Keyboard session") {
+                Section {
+                    Toggle("Start session when AFK opens", isOn: $session.settings.autoStartSession)
                     Stepper(
-                        "Session length: \(session.settings.sessionMinutes) min",
+                        "Turn mic off after \(session.settings.sessionMinutes) min idle",
                         value: $session.settings.sessionMinutes,
-                        in: 5...60,
+                        in: 5...120,
                         step: 5
                     )
+                } header: {
+                    Text("Keyboard session")
+                } footer: {
+                    Text("During a session AFK keeps the microphone ready (orange indicator) so the AFK Keyboard can dictate in any app without switching back. Audio is only kept while you use the keyboard mic. Each dictation resets the idle timer.")
                 }
 
                 if let saveMessage {

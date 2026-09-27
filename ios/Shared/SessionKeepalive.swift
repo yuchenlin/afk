@@ -1,18 +1,16 @@
 import AVFoundation
 import Foundation
 
-/// Keeps `UIBackgroundModes: audio` honest while a dictation session is active.
+/// Backup background-audio assertion for a dictation session.
 ///
-/// Activating `AVAudioSession` alone does **not** prevent suspension. iOS only
-/// keeps the process running when audio is actually playing or recording.
-/// Without this, Darwin notifies and the command poll timer never fire once the
-/// user leaves the AFK app — the keyboard shows an orange mic (session.active
-/// still true in the App Group) but tap/hold does nothing.
+/// The primary assertion is the session-long mic engine in `AudioCapture` (recording keeps
+/// the host running under `UIBackgroundModes: audio`). This near-silent loop runs beside it
+/// so the process stays alive long enough to publish state if iOS stops the mic
+/// (interruption / route change). It is never paused for capture.
 ///
-/// Important: the session must stay **mixable** (`.mixWithOthers`). Activating a
-/// non-mixable session while backgrounded throws OSStatus 560557684 (`!int` =
-/// `AVAudioSessionErrorCodeCannotInterruptOthers`). Pure digital silence is also
-/// treated as "not playing" on some iOS builds — we emit a near-silent sine.
+/// The session must stay **mixable** (`.mixWithOthers`). Activating a non-mixable session
+/// while backgrounded throws OSStatus 560557684 (`!int` = CannotInterruptOthers). Pure
+/// digital silence is treated as "not playing" on some iOS builds — we emit a near-silent sine.
 @MainActor
 public final class SessionKeepalive {
     private var player: AVAudioPlayer?
@@ -22,12 +20,13 @@ public final class SessionKeepalive {
     public var isRunning: Bool { player?.isPlaying == true }
 
     /// Shared mixable category used by keepalive and capture so background
-    /// reactivation never hits CannotInterruptOthers.
+    /// reactivation never hits CannotInterruptOthers. `.default` mode (not `.voiceChat`)
+    /// so a session-long hot mic does not switch other apps to call-style volume.
     public static func activateMixableSession() throws {
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(
             .playAndRecord,
-            mode: .voiceChat,
+            mode: .default,
             options: [.mixWithOthers, .allowBluetoothHFP, .defaultToSpeaker]
         )
         try session.setActive(true)
@@ -48,12 +47,6 @@ public final class SessionKeepalive {
             throw AudioCapture.CaptureError.engineStart("Silent keepalive failed to play")
         }
         self.player = player
-    }
-
-    /// Stop playback but leave the AVAudioSession active (capture will own input).
-    public func pauseForCapture() {
-        player?.stop()
-        player = nil
     }
 
     public func stop() {

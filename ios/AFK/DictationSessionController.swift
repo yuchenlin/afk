@@ -3,7 +3,13 @@ import Combine
 import Foundation
 import UIKit
 
-/// Keeps a background-capable dictation "session" alive and handles record → STT → App Group.
+/// Host side of keyboard dictation (Wispr Flow / Typeless model).
+///
+/// A session starts the mic engine **once, while AFK is foreground**, and keeps it running
+/// ("hot mic", orange indicator on). iOS keeps a recording app alive in the background, but
+/// refuses to *start* a mixable recording from the background (`cannotStartRecording`), which
+/// is why starting capture per keyboard tap failed once the user left AFK. Keyboard start/stop
+/// now only arm/disarm which buffers are kept → STT → App Group result.
 @MainActor
 final class DictationSessionController: ObservableObject {
     @Published var settings: IOSSettings = .load()
@@ -14,7 +20,10 @@ final class DictationSessionController: ObservableObject {
     @Published var level: Float = 0
     @Published var micGranted = false
     @Published var errorMessage: String?
-    @Published var keepaliveRunning = false
+    /// Session mic engine is running (keyboard can dictate from any app).
+    @Published var micLive = false
+    /// Session was (re)started from the keyboard CTA — show "swipe back" hint.
+    @Published var openedFromKeyboard = false
 
     private let relay = SessionRelay.shared
     private let capture = AudioCapture()
@@ -24,51 +33,64 @@ final class DictationSessionController: ObservableObject {
     private let polisher = SimplePolisher()
     private var sessionTimer: Timer?
     private var commandPollTimer: Timer?
+    private let heartbeatQueue = DispatchQueue(label: "xyz.yuchenlin.afk.heartbeat", qos: .userInitiated)
+    private var heartbeat: DispatchSourceTimer?
     private var observers: [NSObjectProtocol] = []
+    private var darwinObservers: [NSObjectProtocol] = []
+    private var starting = false
+    /// User tapped End while foreground — don't auto-start again until AFK re-enters foreground.
+    private var suppressAutoStart = false
 
     init() {
-        syncFromRelay()
+        // A fresh process never has a running engine; drop state left by a killed host so
+        // the keyboard shows the CTA instead of a dead "session on".
+        if relay.isSessionActive || relay.isRecording {
+            relay.isRecording = false
+            relay.isSessionActive = false
+            relay.sessionExpiresAt = nil
+            relay.clearHostHeartbeat()
+        }
+        micGranted = AudioCapture.hasPermission
+
         capture.onLevel = { [weak self] level in
-            Task { @MainActor in
-                self?.level = level
-                self?.relay.recordingLevel = level
-            }
+            self?.level = level
+            self?.relay.recordingLevel = level
         }
-        observers.append(DarwinNotify.observe(AppGroupConstants.noteStartRecording) { [weak self] in
+        capture.onEngineStopped = { [weak self] in
+            self?.handleEngineLost(reason: "Audio route changed")
+        }
+
+        darwinObservers.append(DarwinNotify.observe(AppGroupConstants.noteStartRecording) { [weak self] in
             Task { @MainActor in self?.pollKeyboardCommand() }
         })
-        observers.append(DarwinNotify.observe(AppGroupConstants.noteStopRecording) { [weak self] in
+        darwinObservers.append(DarwinNotify.observe(AppGroupConstants.noteStopRecording) { [weak self] in
             Task { @MainActor in self?.pollKeyboardCommand() }
         })
-        observers.append(DarwinNotify.observe(AppGroupConstants.noteOpenHost) { [weak self] in
-            Task { @MainActor in
-                // Best-effort: only runs if host is already awake.
-                self?.status = "Keyboard asked to open AFK"
-                self?.relay.statusMessage = self?.status ?? ""
-            }
-        })
-        // Always poll lightly so a missed Darwin notify still lands while the app is alive.
-        commandPollTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+        // Backstop for a missed Darwin notify; runs whenever the process is alive (hot mic keeps it so).
+        let poll = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.pollKeyboardCommand() }
         }
-        // Ensure poll timer fires in common run-loop modes (scroll / tracking).
-        if let commandPollTimer {
-            RunLoop.main.add(commandPollTimer, forMode: .common)
-        }
-        Task { await refreshMicPermission() }
+        RunLoop.main.add(poll, forMode: .common)
+        commandPollTimer = poll
+
+        let center = NotificationCenter.default
+        observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
+            let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            Task { @MainActor in self?.handleInterruption(raw.flatMap(AVAudioSession.InterruptionType.init(rawValue:))) }
+        })
+        observers.append(center.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.handleEngineLost(reason: "Audio services reset") }
+        })
+        observers.append(center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.suppressAutoStart = false }
+        })
     }
 
     deinit {
-        observers.forEach { DarwinNotify.stop($0) }
+        darwinObservers.forEach { DarwinNotify.stop($0) }
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
         commandPollTimer?.invalidate()
-    }
-
-    func syncFromRelay() {
-        isSessionActive = relay.isSessionActive
-        isRecording = relay.isRecording
-        if let exp = relay.sessionExpiresAt, exp < Date() {
-            endSession()
-        }
+        heartbeat?.cancel()
     }
 
     func refreshMicPermission() async {
@@ -77,195 +99,269 @@ final class DictationSessionController: ObservableObject {
 
     func saveSettings() {
         settings.save()
-        if isSessionActive {
-            beginSession(restartTimerOnly: true)
-        }
+        if isSessionActive { extendSession() }
     }
 
-    func beginSession(restartTimerOnly: Bool = false) {
-        let minutes = max(1, settings.sessionMinutes)
-        let expires = Date().addingTimeInterval(TimeInterval(minutes * 60))
-        relay.sessionExpiresAt = expires
-        relay.isSessionActive = true
+    // MARK: - Session lifecycle
+
+    /// Start (or revive) the session mic. Must run while AFK is foreground.
+    func beginSession() async {
+        guard !starting else { return }
+        starting = true
+        defer { starting = false }
+        errorMessage = nil
+        suppressAutoStart = false
+
+        if !micGranted { await refreshMicPermission() }
+        guard micGranted else {
+            fail("Microphone access is off — allow it in Settings → AFK → Microphone.", status: "Mic permission needed")
+            return
+        }
+
+        do {
+            try capture.startEngine()
+        } catch {
+            micLive = false
+            fail(error.localizedDescription, status: "Mic failed to start")
+            if isSessionActive { publishHeartbeat(flush: true) }
+            return
+        }
+        micLive = true
+        // Backup assertion only; the running mic engine is what keeps AFK alive in the background.
+        try? keepalive.start()
+
         isSessionActive = true
-        status = "Session active · \(minutes) min"
-        relay.statusMessage = status
-
-        sessionTimer?.invalidate()
-        sessionTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.relay.touchHostHeartbeat(alive: true)
-                if let exp = self.relay.sessionExpiresAt {
-                    let left = Int(exp.timeIntervalSinceNow)
-                    if left <= 0 {
-                        self.endSession()
-                    } else if left % 30 == 0 {
-                        self.status = "Session · \(left / 60)m \(left % 60)s left"
-                        self.relay.statusMessage = self.status
-                    }
-                }
-            }
-        }
-        if let sessionTimer {
-            RunLoop.main.add(sessionTimer, forMode: .common)
-        }
-
-        // Silent looping audio is what actually keeps us unsuspended under UIBackgroundModes:audio.
-        startKeepaliveIfNeeded()
-        relay.touchHostHeartbeat(alive: true, flush: true)
-
-        if !restartTimerOnly {
-            // Soft keepalive beep intentionally omitted — SessionKeepalive is the real assertion.
-        }
+        relay.isSessionActive = true
+        extendSession()
+        startTimers()
+        publishHeartbeat(flush: true)
+        setStatus("Mic ready · dictate from the AFK keyboard")
     }
 
     func endSession() {
-        if isRecording {
-            Task { await stopRecordingAndTranscribe() }
-        }
+        if isRecording { _ = capture.disarm() }
+        isRecording = false
+        relay.isRecording = false
         sessionTimer?.invalidate()
         sessionTimer = nil
+        heartbeat?.cancel()
+        heartbeat = nil
+        capture.stopEngine()
         keepalive.stop()
-        keepaliveRunning = false
+        micLive = false
+        openedFromKeyboard = false
         relay.clearHostHeartbeat()
         relay.isSessionActive = false
         relay.sessionExpiresAt = nil
         relay.recordingLevel = 0
+        level = 0
         isSessionActive = false
-        status = "Session ended"
-        relay.statusMessage = status
+        setStatus("Session ended")
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     func toggleSession() {
-        if isSessionActive { endSession() } else { beginSession() }
+        if isSessionActive {
+            suppressAutoStart = true
+            endSession()
+        } else {
+            Task { await beginSession() }
+        }
     }
 
-    /// Deep link / URL scheme entry (`afk://wake`, `afk://session`, `afk://record`).
+    /// Deep link from the keyboard CTA (`afk://session`, legacy `afk://wake` / `afk://record`).
     func handleOpenURL(_ url: URL) {
         guard url.scheme == AppGroupConstants.urlScheme else { return }
-        let host = (url.host ?? url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))).lowercased()
-        if !isSessionActive {
-            beginSession()
-        }
-        status = "Session ready for keyboard"
-        relay.statusMessage = status
-        // Drain any keyboard command that was posted while we were suspended.
-        pollKeyboardCommand()
-        if host == AppGroupConstants.urlHostRecord, !isRecording {
-            Task { try? await startRecordingFromKeyboard() }
+        openedFromKeyboard = true
+        Task {
+            await ensureSessionLive()
+            pollKeyboardCommand()
         }
     }
 
-    /// Host became foreground — republish liveness right away so the keyboard sees
-    /// `.ready` without waiting for the 1 Hz session timer, and drain a queued command.
+    /// Host became foreground: the one moment iOS allows (re)starting the mic.
     func noteBecameActive() {
-        guard isSessionActive || relay.isSessionActive else { return }
-        relay.touchHostHeartbeat(alive: true, flush: true)
-        if !isRecording {
-            beginSession(restartTimerOnly: true)
+        Task {
+            if isSessionActive {
+                await ensureSessionLive()
+            } else if settings.autoStartSession, !suppressAutoStart,
+                      UserDefaults.standard.bool(forKey: "afk.ios.onboardingDone"),
+                      AudioCapture.hasPermission {
+                await beginSession()
+            }
+            pollKeyboardCommand()
         }
-        pollKeyboardCommand()
     }
 
-    private func startKeepaliveIfNeeded() {
-        do {
-            try keepalive.start()
-            keepaliveRunning = true
-            // Clear prior failure so UI never shows green "on" + red failed together.
-            if errorMessage?.hasPrefix("Background audio keepalive failed:") == true {
-                errorMessage = nil
-            }
-            if status.hasPrefix("Keepalive failed") {
-                let minutes = max(1, settings.sessionMinutes)
-                status = "Session active · \(minutes) min"
-                relay.statusMessage = status
-            }
-        } catch {
-            keepaliveRunning = false
-            let ns = error as NSError
-            let detail: String
-            if ns.domain == NSOSStatusErrorDomain, ns.code == 560557684 {
-                detail = "CannotInterruptOthers (!int) — session was non-mixable in background"
-            } else {
-                detail = error.localizedDescription
-            }
-            errorMessage = "Background audio keepalive failed: \(detail)"
-            status = "Keepalive failed — stay in AFK"
-            relay.statusMessage = status
+    /// Host UI "Resume mic" (foreground).
+    func resumeMic() {
+        Task { await ensureSessionLive() }
+    }
+
+    private func ensureSessionLive() async {
+        if isSessionActive, capture.isRunning, capture.isDeliveringAudio {
+            micLive = true
+            try? keepalive.start()
+            extendSession()
+            publishHeartbeat(flush: true)
+            return
+        }
+        if isSessionActive { capture.stopEngine() }
+        await beginSession()
+    }
+
+    /// Idle timeout: each dictation / foreground visit pushes expiry out again.
+    private func extendSession() {
+        let minutes = max(1, settings.sessionMinutes)
+        relay.sessionExpiresAt = Date().addingTimeInterval(TimeInterval(minutes * 60))
+    }
+
+    private func startTimers() {
+        sessionTimer?.invalidate()
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.sessionTick() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        sessionTimer = timer
+
+        // Heartbeat on its own queue so it keeps flowing even if the main thread is busy.
+        heartbeat?.cancel()
+        let hb = DispatchSource.makeTimerSource(queue: heartbeatQueue)
+        hb.schedule(deadline: .now(), repeating: 1.0, leeway: .milliseconds(200))
+        let relay = self.relay
+        let capture = self.capture
+        hb.setEventHandler {
+            relay.touchHostHeartbeat(alive: true, micLive: capture.isDeliveringAudio)
+        }
+        hb.resume()
+        heartbeat = hb
+    }
+
+    private func sessionTick() {
+        guard isSessionActive else { return }
+        let live = capture.isRunning && capture.isDeliveringAudio
+        if live != micLive {
+            micLive = live
+            if !live { handleEngineLost(reason: "Mic stopped") }
+        }
+        guard !isRecording, let exp = relay.sessionExpiresAt else { return }
+        let left = Int(exp.timeIntervalSinceNow)
+        if left <= 0 {
+            endSession()
+            setStatus("Session ended after \(max(1, settings.sessionMinutes)) min idle")
+        } else if left % 60 == 0, micLive {
+            setStatus("Mic ready · ends after \(left / 60) min idle")
         }
     }
+
+    private func publishHeartbeat(flush: Bool) {
+        relay.touchHostHeartbeat(alive: true, micLive: capture.isDeliveringAudio, flush: flush)
+    }
+
+    // MARK: - Mic loss / recovery
+
+    private func handleInterruption(_ type: AVAudioSession.InterruptionType?) {
+        guard isSessionActive else { return }
+        switch type {
+        case .began:
+            if isRecording { Task { await stopRecordingAndTranscribe() } }
+            micLive = false
+            setStatus("Mic interrupted")
+            publishHeartbeat(flush: true)
+        case .ended:
+            recoverMic()
+        default:
+            break
+        }
+    }
+
+    private func handleEngineLost(reason: String) {
+        guard isSessionActive else { return }
+        if isRecording { Task { await stopRecordingAndTranscribe() } }
+        recoverMic(reason: reason)
+    }
+
+    /// Try to restart the engine. Succeeds in the foreground; in the background iOS usually
+    /// refuses (`cannotStartRecording`) and the keyboard shows "Mic paused — open AFK once".
+    private func recoverMic(reason: String = "Mic interrupted") {
+        guard isSessionActive else { return }
+        capture.stopEngine()
+        do {
+            try capture.startEngine()
+            try? keepalive.start()
+            micLive = true
+            setStatus("Mic ready · dictate from the AFK keyboard")
+        } catch {
+            micLive = false
+            setStatus("\(reason) — open AFK once to resume mic")
+        }
+        publishHeartbeat(flush: true)
+    }
+
+    // MARK: - Keyboard commands
 
     private func pollKeyboardCommand() {
         guard let pending = relay.consumeCommand() else { return }
-        handleKeyboardCommand(pending.command)
-    }
-
-    private func handleKeyboardCommand(_ command: SessionRelay.Command) {
-        switch command {
+        switch pending.command {
         case .start:
-            Task { try? await startRecordingFromKeyboard() }
+            Task { await startRecordingFromKeyboard() }
         case .stop:
-            Task { await stopRecordingAndTranscribe() }
+            Task { await stopRecordingFromKeyboard() }
         }
     }
 
-    func startRecordingFromKeyboard() async throws {
-        guard isSessionActive || relay.isSessionActive else {
-            relay.publishError("Start a dictation session in the AFK app first.")
-            status = "No active session"
-            relay.statusMessage = status
+    private func startRecordingFromKeyboard() async {
+        guard isSessionActive else {
+            relay.publishError("Open AFK once to start a session.")
+            setStatus("No active session")
             return
         }
-        if !isSessionActive { beginSession() }
-        try await startRecording()
+        do {
+            try await startRecording()
+        } catch {
+            relay.publishError(error.localizedDescription)
+            setStatus(error.localizedDescription)
+        }
     }
+
+    private func stopRecordingFromKeyboard() async {
+        guard isRecording else {
+            // Start never took (or a quick tap raced it) — unblock the keyboard's "Transcribing…".
+            relay.publishError("Nothing recorded — tap the mic, speak, then tap again")
+            return
+        }
+        await stopRecordingAndTranscribe()
+    }
+
+    // MARK: - Record / transcribe
 
     func startRecording() async throws {
         errorMessage = nil
-        if !micGranted {
-            await refreshMicPermission()
-            guard micGranted else { throw AudioCapture.CaptureError.noPermission }
+        if isRecording { return }
+        if !isSessionActive || !capture.isRunning {
+            // Works in the foreground; from the background iOS refuses → `.needsForeground`.
+            await ensureSessionLive()
         }
-        if !isSessionActive { beginSession() }
-
-        // Pause keepalive playback so AVAudioEngine can own the input.
-        // Leave the mixable AVAudioSession active — do not deactivate.
-        // Recording itself asserts UIBackgroundModes:audio once the engine starts.
-        keepalive.pauseForCapture()
-        keepaliveRunning = false
-
-        do {
-            try capture.start()
-        } catch {
-            // Capture failed (often while backgrounded) — restore keepalive immediately
-            // so the host is not left without a background assertion.
-            startKeepaliveIfNeeded()
-            throw error
+        guard capture.isRunning, capture.arm() else {
+            micLive = false
+            publishHeartbeat(flush: true)
+            throw AudioCapture.CaptureError.needsForeground
         }
         isRecording = true
         relay.isRecording = true
-        relay.touchHostHeartbeat(alive: true)
-        status = "Recording…"
-        relay.statusMessage = status
+        extendSession()
+        setStatus("Recording…")
     }
 
     func stopRecordingAndTranscribe() async {
-        guard isRecording || capture.isRecording else { return }
-        let pcm = capture.stop()
+        guard isRecording else { return }
+        let pcm = capture.disarm()
         isRecording = false
         relay.isRecording = false
         relay.recordingLevel = 0
         level = 0
-        status = "Transcribing…"
-        relay.statusMessage = status
-
-        // Resume keepalive so the session stays unsuspended for the next utterance.
-        if isSessionActive || relay.isSessionActive {
-            startKeepaliveIfNeeded()
-            relay.touchHostHeartbeat(alive: true)
-        }
+        extendSession()
+        setStatus("Transcribing…")
 
         do {
             // Reload so Keychain / App Group migrations apply even if Settings sheet wasn't opened.
@@ -286,8 +382,7 @@ final class DictationSessionController: ObservableObject {
                 apiKey: apiKey
             )
             if settings.polishEnabled, !useMock, apiKey != nil {
-                status = "Polishing…"
-                relay.statusMessage = status
+                setStatus("Polishing…")
                 let polish: TextPolishing = polisher
                 if let polished = try? await polish.polish(text, model: settings.polishModel, apiKey: apiKey),
                    !polished.isEmpty {
@@ -298,14 +393,24 @@ final class DictationSessionController: ObservableObject {
             }
             lastTranscript = text
             relay.publishResult(text)
-            status = "Ready"
-            relay.statusMessage = status
+            setStatus(micLive ? "Mic ready · dictate from the AFK keyboard" : "Ready")
             UIPasteboard.general.string = text
         } catch {
             errorMessage = error.localizedDescription
-            status = "Error"
-            relay.statusMessage = status
+            setStatus("Error")
             relay.publishError(error.localizedDescription)
         }
+    }
+
+    // MARK: - Helpers
+
+    private func setStatus(_ text: String) {
+        status = text
+        relay.statusMessage = text
+    }
+
+    private func fail(_ message: String, status: String) {
+        errorMessage = message
+        setStatus(status)
     }
 }

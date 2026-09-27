@@ -14,12 +14,29 @@ struct ContentView: View {
                     .multilineTextAlignment(.center)
 
                 if session.isSessionActive {
-                    Text(session.keepaliveRunning
-                         ? "Background audio keepalive on — mic works from keyboard"
-                         : "Keepalive off — host may suspend; mic may do nothing")
-                        .font(.caption)
-                        .foregroundStyle(session.keepaliveRunning ? .green : .orange)
-                        .multilineTextAlignment(.center)
+                    VStack(spacing: 8) {
+                        Text(session.micLive
+                             ? "Mic ready — switch to any app and use the AFK keyboard. Ends after \(session.settings.sessionMinutes) min without dictation."
+                             : "iOS paused the mic — tap Resume mic while AFK is open")
+                            .font(.caption)
+                            .foregroundStyle(session.micLive ? .green : .orange)
+                            .multilineTextAlignment(.center)
+                        if !session.micLive {
+                            Button("Resume mic") { session.resumeMic() }
+                                .buttonStyle(.borderedProminent)
+                                .tint(.orange)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+
+                if session.openedFromKeyboard, session.micLive {
+                    Label("Session started. Tap ◀ at the top-left (or swipe right along the bottom edge) to go back and dictate.", systemImage: "arrow.uturn.backward.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.green.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                         .padding(.horizontal)
                 }
 
@@ -48,8 +65,7 @@ struct ContentView: View {
                     .padding(.horizontal)
                 }
 
-                // Only show keepalive/error banner when it contradicts success state.
-                if let err = session.errorMessage, !(session.keepaliveRunning && err.hasPrefix("Background audio keepalive failed:")) {
+                if let err = session.errorMessage {
                     Text(err)
                         .font(.footnote)
                         .foregroundStyle(.red)
