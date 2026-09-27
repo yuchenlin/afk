@@ -73,6 +73,10 @@ final class KeyboardView: UIView {
     private var candidates: [PinyinIME.Candidate] = []
     /// Cached polish toggle from App Group (`IOSSettings.polishEnabled`).
     private var polishEnabled = true
+    /// While set and in the future, `setStatus` leaves `statusLabel` alone so a
+    /// deliberate `flash` (e.g. polish toggle) is not overwritten by the 0.2s poll.
+    private var statusHoldUntil: Date?
+    private var statusFlashWorkItem: DispatchWorkItem?
 
     /// Mic gesture: touch-down starts at once (no pre-roll exists, so waiting would clip the
     /// first syllable). Release after `holdThreshold` = hold-to-talk → stop. A shorter touch
@@ -125,6 +129,15 @@ final class KeyboardView: UIView {
         waveform.isHidden = !recording || mode != .voice
         let sendHint = isMicLatched ? "Listening… tap to send" : "Listening… release to send"
 
+        // Full Access / recording must win over a flash hold; cancel and write normally.
+        let forceStatus = needsFullAccess || recording
+        if forceStatus {
+            statusFlashWorkItem?.cancel()
+            statusFlashWorkItem = nil
+            statusHoldUntil = nil
+        }
+        let holding = !forceStatus && (statusHoldUntil.map { Date() < $0 } ?? false)
+
         if needsFullAccess {
             statusLabel.text = "Full Access off · typing OK · dictation needs AFK app + Full Access"
             statusLabel.textColor = .systemOrange
@@ -138,34 +151,44 @@ final class KeyboardView: UIView {
             holdHint.text = sendHint
             applyCTA(nil)
         } else if sessionOn, health == .down {
-            statusLabel.text = "Session paused · open AFK once to resume"
-            statusLabel.textColor = .systemOrange
+            if !holding {
+                statusLabel.text = "Session paused · open AFK once to resume"
+                statusLabel.textColor = .systemOrange
+            }
             styleMic(ready: false, recording: false)
             holdHint.text = "Open AFK to resume"
             applyCTA(cta ?? .sessionExpired)
         } else if sessionOn, micBlocked {
-            statusLabel.text = "iOS turned the AFK mic off (call, Siri or audio change)"
-            statusLabel.textColor = .systemOrange
+            if !holding {
+                statusLabel.text = "iOS turned the AFK mic off (call, Siri or audio change)"
+                statusLabel.textColor = .systemOrange
+            }
             styleMic(ready: false, recording: false)
             holdHint.text = "Open AFK once to turn it back on"
             applyCTA(cta ?? .recoverHost)
         } else if sessionOn, health == .degraded {
-            let base = hostStatus.isEmpty ? "Session on · waking…" : hostStatus
-            statusLabel.text = base
-            statusLabel.textColor = palette.secondaryText
+            if !holding {
+                let base = hostStatus.isEmpty ? "Session on · waking…" : hostStatus
+                statusLabel.text = base
+                statusLabel.textColor = palette.secondaryText
+            }
             styleMic(ready: true, recording: false)
             holdHint.text = isMicLatched ? sendHint : "Hold to talk · or tap"
             applyCTA(cta)
         } else if sessionOn {
-            let base = hostStatus.isEmpty ? "Session on · mic muted until you hold" : hostStatus
-            statusLabel.text = base
-            statusLabel.textColor = palette.secondaryText
+            if !holding {
+                let base = hostStatus.isEmpty ? "Session on · mic muted until you hold" : hostStatus
+                statusLabel.text = base
+                statusLabel.textColor = palette.secondaryText
+            }
             styleMic(ready: true, recording: false)
             holdHint.text = isMicLatched ? sendHint : "Hold to talk · or tap"
             applyCTA(cta)
         } else {
-            statusLabel.text = "No session · open AFK → Start dictation session"
-            statusLabel.textColor = .systemOrange
+            if !holding {
+                statusLabel.text = "No session · open AFK → Start dictation session"
+                statusLabel.textColor = .systemOrange
+            }
             styleMic(ready: false, recording: false)
             holdHint.text = "Open AFK once"
             applyCTA(cta ?? .startSession)
@@ -196,15 +219,18 @@ final class KeyboardView: UIView {
     }
 
     func flash(_ message: String, duration: TimeInterval = 1.4) {
-        let previous = statusLabel.text
-        let previousColor = statusLabel.textColor
+        statusFlashWorkItem?.cancel()
+        statusHoldUntil = Date().addingTimeInterval(duration)
         statusLabel.text = message
         statusLabel.textColor = .label
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
-            guard let self, self.statusLabel.text == message else { return }
-            self.statusLabel.text = previous
-            self.statusLabel.textColor = previousColor
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.statusHoldUntil = nil
+            self.statusFlashWorkItem = nil
+            // Do not restore stale previous text — next setStatus paints chrome.
         }
+        statusFlashWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: work)
     }
 
     // MARK: - Build
