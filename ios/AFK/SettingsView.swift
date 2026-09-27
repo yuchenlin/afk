@@ -4,11 +4,14 @@ struct SettingsView: View {
     @EnvironmentObject private var session: DictationSessionController
     @Environment(\.dismiss) private var dismiss
     @State private var apiKey: String = KeychainStore.readAPIKey() ?? ""
+    @State private var vocabularyText: String = IOSVocabulary.loadText()
     @State private var saveMessage: String?
     @State private var testing = false
     @State private var testSpeech: String?
     @State private var testPolish: String?
     @State private var testKeychain: String?
+
+    private var lexicon: IOSLexicon { IOSLexicon(from: vocabularyText) }
 
     var body: some View {
         NavigationStack {
@@ -61,6 +64,41 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    TextEditor(text: $vocabularyText)
+                        .font(.system(.body, design: .monospaced))
+                        .frame(minHeight: 160)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+
+                    HStack {
+                        Text("\(lexicon.keyTermsForStt.count) / \(IOSLexicon.maxKeyTerms) terms")
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Reset to Examples") {
+                            vocabularyText = IOSVocabulary.bundledDefaults
+                        }
+                        .font(.caption)
+                    }
+
+                    if !lexicon.tooLongTerms.isEmpty {
+                        Text("Over \(IOSLexicon.maxTermLength) characters, not sent: \(lexicon.tooLongTerms.joined(separator: ", "))")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                    if lexicon.overLimitCount > 0 {
+                        Text("\(lexicon.overLimitCount) term(s) past the first \(IOSLexicon.maxKeyTerms) are not sent")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                } header: {
+                    Text("Vocabulary")
+                } footer: {
+                    Text("One word or phrase per line (names, jargon, e.g. GRPO, Hotshot). Sent to Grok as STT key terms and polish hints. Lines starting with # are comments. Max \(IOSLexicon.maxKeyTerms) terms, ≤\(IOSLexicon.maxTermLength) characters each.")
+                }
+
+                Section {
                     Toggle("Start session when AFK opens", isOn: $session.settings.autoStartSession)
                     Stepper(
                         "End session after \(session.settings.sessionMinutes) min idle",
@@ -87,6 +125,9 @@ struct SettingsView: View {
                     Button("Save") { save() }
                 }
             }
+            .onAppear {
+                vocabularyText = IOSVocabulary.loadText()
+            }
         }
     }
 
@@ -111,13 +152,17 @@ struct SettingsView: View {
                     session.settings.useMockSTT = false
                 }
             }
+            IOSVocabulary.save(vocabularyText)
             session.saveSettings()
             // Confirm round-trip from Keychain (catches access-group / entitlement issues).
             let readBack = KeychainStore.readAPIKey()
+            let vocabCount = IOSLexicon(from: vocabularyText).keyTermsForStt.count
             if trimmed.isEmpty {
-                saveMessage = readBack == nil ? "Saved (key cleared)" : "Cleared, but Keychain still has a value"
+                saveMessage = readBack == nil
+                    ? "Saved (key cleared, \(vocabCount) vocab terms)"
+                    : "Cleared, but Keychain still has a value"
             } else if readBack == trimmed {
-                saveMessage = "Saved — Keychain OK"
+                saveMessage = "Saved — Keychain OK · \(vocabCount) vocab terms"
             } else {
                 saveMessage = "Saved, but Keychain read-back failed — check keychain-access-groups entitlement"
             }

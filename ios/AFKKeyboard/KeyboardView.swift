@@ -75,12 +75,22 @@ final class KeyboardView: UIView {
     private enum MicGesture { case idle, pressing(since: Date), latched }
     private var micGesture: MicGesture = .idle
     private let holdThreshold: TimeInterval = 0.4
+    /// Last mic chrome state so trait changes can restyle without a status refresh.
+    private var micReady = false
+    private var micRecording = false
+    private var palette: Palette { Palette(traitCollection) }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = UIColor(red: 0.11, green: 0.11, blue: 0.12, alpha: 1)
         buildChrome()
+        applyAppearance()
         applyMode(.voice, animated: false)
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else { return }
+        applyAppearance()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -137,14 +147,14 @@ final class KeyboardView: UIView {
         } else if sessionOn, health == .degraded {
             let base = hostStatus.isEmpty ? "Session on · waking…" : hostStatus
             statusLabel.text = base
-            statusLabel.textColor = UIColor(white: 0.65, alpha: 1)
+            statusLabel.textColor = palette.secondaryText
             styleMic(ready: true, recording: false)
             holdHint.text = isMicLatched ? sendHint : "Hold to talk · or tap"
             applyCTA(cta)
         } else if sessionOn {
             let base = hostStatus.isEmpty ? "Session on · mic muted until you hold" : hostStatus
             statusLabel.text = base
-            statusLabel.textColor = UIColor(white: 0.65, alpha: 1)
+            statusLabel.textColor = palette.secondaryText
             styleMic(ready: true, recording: false)
             holdHint.text = isMicLatched ? sendHint : "Hold to talk · or tap"
             applyCTA(cta)
@@ -201,7 +211,7 @@ final class KeyboardView: UIView {
         previewLabel.font = .systemFont(ofSize: 15, weight: .medium)
         previewLabel.textAlignment = .center
         previewLabel.numberOfLines = 2
-        previewLabel.textColor = .white
+        previewLabel.textColor = palette.primaryText
         previewLabel.isHidden = true
 
         contentHost.translatesAutoresizingMaskIntoConstraints = false
@@ -230,7 +240,7 @@ final class KeyboardView: UIView {
 
         brandLabel.text = "AFK"
         brandLabel.font = .systemFont(ofSize: 17, weight: .semibold)
-        brandLabel.textColor = .white
+        brandLabel.textColor = palette.primaryText
 
         modeBar.axis = .horizontal
         modeBar.spacing = 4
@@ -248,7 +258,7 @@ final class KeyboardView: UIView {
         headerBar.addArrangedSubview(modeBar)
 
         holdHint.font = .systemFont(ofSize: 15, weight: .medium)
-        holdHint.textColor = UIColor(white: 0.7, alpha: 1)
+        holdHint.textColor = palette.secondaryText
         holdHint.textAlignment = .center
         holdHint.text = "Hold to talk · or tap"
 
@@ -275,9 +285,7 @@ final class KeyboardView: UIView {
         styleRoundChrome(voiceBackspace, systemName: "delete.left.fill")
         styleRoundChrome(voiceAt, title: "@")
         voiceReturn.setTitle("return", for: .normal)
-        voiceReturn.setTitleColor(.white, for: .normal)
         voiceReturn.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
-        voiceReturn.backgroundColor = UIColor(white: 0.22, alpha: 1)
         voiceReturn.layer.cornerRadius = 22
         voiceReturn.translatesAutoresizingMaskIntoConstraints = false
         voiceAIBtn.addAction(UIAction { [weak self] _ in self?.flash("AI polish runs in the AFK host") }, for: .touchUpInside)
@@ -312,10 +320,7 @@ final class KeyboardView: UIView {
         ])
 
         ctaButton.translatesAutoresizingMaskIntoConstraints = false
-        ctaButton.backgroundColor = UIColor(white: 0.22, alpha: 1)
         ctaButton.layer.cornerRadius = 18
-        ctaButton.tintColor = .white
-        ctaButton.setTitleColor(.white, for: .normal)
         ctaButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
         ctaButton.titleLabel?.adjustsFontSizeToFitWidth = true
         ctaButton.titleLabel?.minimumScaleFactor = 0.75
@@ -371,9 +376,9 @@ final class KeyboardView: UIView {
             btn.setTitle(title, for: .normal)
             btn.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
         }
-        btn.tintColor = selected ? .white : UIColor(white: 0.65, alpha: 1)
-        btn.setTitleColor(selected ? .white : UIColor(white: 0.65, alpha: 1), for: .normal)
-        btn.backgroundColor = selected ? UIColor(white: 0.28, alpha: 1) : .clear
+        btn.tintColor = selected ? palette.chipSelectedFg : palette.secondaryText
+        btn.setTitleColor(selected ? palette.chipSelectedFg : palette.secondaryText, for: .normal)
+        btn.backgroundColor = selected ? palette.chipSelectedBg : .clear
         btn.layer.cornerRadius = 14
         btn.contentEdgeInsets = UIEdgeInsets(top: 6, left: 10, bottom: 6, right: 10)
         btn.heightAnchor.constraint(equalToConstant: 28).isActive = true
@@ -382,10 +387,10 @@ final class KeyboardView: UIView {
 
     private func styleRoundChrome(_ btn: UIButton, systemName: String? = nil, title: String? = nil) {
         btn.translatesAutoresizingMaskIntoConstraints = false
-        btn.backgroundColor = UIColor(white: 0.22, alpha: 1)
+        btn.backgroundColor = palette.chromeFill
         btn.layer.cornerRadius = 22
-        btn.tintColor = .white
-        btn.setTitleColor(.white, for: .normal)
+        btn.tintColor = palette.chromeFg
+        btn.setTitleColor(palette.chromeFg, for: .normal)
         if let systemName {
             let cfg = UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
             btn.setImage(UIImage(systemName: systemName, withConfiguration: cfg), for: .normal)
@@ -401,9 +406,9 @@ final class KeyboardView: UIView {
         let cn = mode == .typingCN
         guard modeVoiceBtn != nil else { return }
         for (btn, on) in [(modeVoiceBtn!, voice), (modeENBtn!, en), (modeCNBtn!, cn)] {
-            btn.backgroundColor = on ? UIColor(white: 0.28, alpha: 1) : .clear
-            btn.tintColor = on ? .white : UIColor(white: 0.65, alpha: 1)
-            btn.setTitleColor(on ? .white : UIColor(white: 0.65, alpha: 1), for: .normal)
+            btn.backgroundColor = on ? palette.chipSelectedBg : .clear
+            btn.tintColor = on ? palette.chipSelectedFg : palette.secondaryText
+            btn.setTitleColor(on ? palette.chipSelectedFg : palette.secondaryText, for: .normal)
         }
     }
 
@@ -541,20 +546,49 @@ final class KeyboardView: UIView {
     }
 
     private func styleMic(ready: Bool, recording: Bool) {
-        // Idle: white pill + black logo. Recording: orange (matches status / Typeless hold).
+        micReady = ready
+        micRecording = recording
+        // Recording: orange + white logo in both modes (matches status / Typeless hold).
+        // Idle dark: white pill + black logo. Idle light: black pill + white logo (strong
+        // primary CTA on light systemGray6 chrome; white-on-white would wash out).
+        // Not-ready: muted fill/glyph in both modes.
         if recording {
             micButton.backgroundColor = .systemOrange
             micButton.tintColor = .white
             micButton.transform = CGAffineTransform(scaleX: 1.02, y: 1.02)
         } else if ready {
-            micButton.backgroundColor = .white
-            micButton.tintColor = .black
+            micButton.backgroundColor = palette.micIdleFill
+            micButton.tintColor = palette.micIdleGlyph
             micButton.transform = .identity
         } else {
-            micButton.backgroundColor = UIColor(white: 0.35, alpha: 1)
-            micButton.tintColor = UIColor(white: 0.55, alpha: 1)
+            micButton.backgroundColor = palette.micDisabledFill
+            micButton.tintColor = palette.micDisabledGlyph
             micButton.transform = .identity
         }
+    }
+
+    /// Restyle chrome for current `userInterfaceStyle`. Called from init + trait changes.
+    private func applyAppearance() {
+        let p = palette
+        backgroundColor = p.keyboardBackground
+        brandLabel.textColor = p.primaryText
+        previewLabel.textColor = p.primaryText
+        holdHint.textColor = p.secondaryText
+        // Leave statusLabel alone — setStatus owns orange/red/secondary; mic restyle is enough.
+
+        voiceReturn.backgroundColor = p.chromeFill
+        voiceReturn.setTitleColor(p.chromeFg, for: .normal)
+        ctaButton.backgroundColor = p.chromeFill
+        ctaButton.tintColor = p.chromeFg
+        ctaButton.setTitleColor(p.chromeFg, for: .normal)
+
+        for btn in [voiceAIBtn, voiceGlobe, voiceBackspace, voiceAt] {
+            btn.backgroundColor = p.chromeFill
+            btn.tintColor = p.chromeFg
+            btn.setTitleColor(p.chromeFg, for: .normal)
+        }
+        refreshModeChips()
+        styleMic(ready: micReady, recording: micRecording)
     }
 
     // MARK: - Mic gestures
@@ -689,6 +723,51 @@ final class KeyboardView: UIView {
         pinyinBuffer = ""
         candidates = []
         refreshCandidates()
+    }
+}
+
+// MARK: - Appearance palette (follows traitCollection.userInterfaceStyle)
+
+/// Colors resolved against the keyboard extension's own trait collection
+/// (not `UITraitCollection.current`, which can lag in keyboard hosts).
+private struct Palette {
+    let dark: Bool
+
+    init(_ traits: UITraitCollection) {
+        dark = traits.userInterfaceStyle == .dark
+    }
+
+    /// Dark: Typeless near-black. Light: system light keyboard wash.
+    var keyboardBackground: UIColor {
+        dark
+            ? UIColor(red: 0.11, green: 0.11, blue: 0.12, alpha: 1)
+            : .systemGray6
+    }
+
+    var primaryText: UIColor { dark ? .white : .label }
+    var secondaryText: UIColor {
+        dark ? UIColor(white: 0.65, alpha: 1) : .secondaryLabel
+    }
+
+    var chromeFill: UIColor {
+        dark ? UIColor(white: 0.22, alpha: 1) : .systemGray4
+    }
+    var chromeFg: UIColor { dark ? .white : .label }
+
+    var chipSelectedBg: UIColor {
+        dark ? UIColor(white: 0.28, alpha: 1) : .systemGray3
+    }
+    var chipSelectedFg: UIColor { dark ? .white : .label }
+
+    /// Idle dark: white pill + black logo. Idle light: black pill + white logo
+    /// (primary CTA contrast on systemGray6; white-on-light would wash out).
+    var micIdleFill: UIColor { dark ? .white : .black }
+    var micIdleGlyph: UIColor { dark ? .black : .white }
+    var micDisabledFill: UIColor {
+        dark ? UIColor(white: 0.35, alpha: 1) : .systemGray3
+    }
+    var micDisabledGlyph: UIColor {
+        dark ? UIColor(white: 0.55, alpha: 1) : .systemGray
     }
 }
 

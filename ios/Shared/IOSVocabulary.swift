@@ -2,7 +2,7 @@ import Foundation
 
 /// Lightweight lexicon for iOS (mirrors Mac `LexiconStore` / `VocabularyStore`).
 /// Stored in the App Group so host STT + polish share the same terms; seeded from the
-/// Mac `Resources/lexicon.example.txt` defaults until a Settings editor ships.
+/// Mac `Resources/lexicon.example.txt` defaults; editable in Settings → Vocabulary.
 public struct IOSLexicon: Sendable, Equatable {
     public static let maxKeyTerms = 100
     public static let maxTermLength = 50
@@ -17,8 +17,16 @@ public struct IOSLexicon: Sendable, Equatable {
         self.init(terms: text.split(whereSeparator: \.isNewline).map(String.init))
     }
 
+    /// Terms the API rejects for length; these are left out of requests.
+    public var tooLongTerms: [String] { terms.filter { $0.count > Self.maxTermLength } }
+
     public var keyTermsForStt: [String] {
         Array(terms.filter { $0.count <= Self.maxTermLength }.prefix(Self.maxKeyTerms))
+    }
+
+    /// Valid terms beyond the per-request limit, which are not sent.
+    public var overLimitCount: Int {
+        max(0, terms.count - tooLongTerms.count - Self.maxKeyTerms)
     }
 
     private static func normalize(_ terms: [String]) -> [String] {
