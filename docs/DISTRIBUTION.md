@@ -88,6 +88,23 @@ make dmg          # make build → scripts/make-dmg.sh → dist/AFK-<version>.dm
 
 The DMG contains `AFK.app` and an `Applications` symlink (drag-to-install). `scripts/make-dmg.sh` **re-signs with Developer ID Application** when that identity exists; otherwise it keeps the signature from `make build` (Apple Development / Local Dev / ad-hoc) and prints a Gatekeeper warning.
 
+### Hardened Runtime + microphone entitlement
+
+Developer ID packaging uses **Hardened Runtime** (`codesign --options runtime`). That requires an explicit entitlement for mic access:
+
+- File: `Supporting/AFK.entitlements` — `com.apple.security.device.audio-input` = true
+- `make build` and `scripts/make-dmg.sh` both pass `--entitlements Supporting/AFK.entitlements`
+- **Do not** enable App Sandbox in that file for the direct-download build (would break network + Accessibility). Sandbox is only for the App Store path in [RELEASE_PLAN.md](RELEASE_PLAN.md).
+
+Without `device.audio-input`, older macOS versions often **omit AFK from System Settings → Privacy & Security → Microphone** even though `NSMicrophoneUsageDescription` is present. After upgrading a signed build, **reinstall** the new DMG (or re-sign in place with the entitlement); toggling the mic switch alone is not enough if the installed binary still lacks the entitlement.
+
+Verify:
+
+```bash
+codesign -d --entitlements - AFK.app | plutil -p -
+# expect: com.apple.security.device.audio-input = true
+```
+
 ### What has / has not been tested
 
 - **Tested:** producing a UDZO DMG with `hdiutil` via `scripts/make-dmg.sh` / `make dmg` on a developer Mac (Apple Development–signed app inside).
@@ -120,7 +137,7 @@ Do **not** paste Apple ID passwords, app-specific passwords, or `.p8` API keys i
 
 1. Enroll in the [Apple Developer Program](https://developer.apple.com/programs/) ($99/year) if not already.
 2. Create and install a **Developer ID Application** certificate (portal or Xcode Manage Certificates) — see above. Xcode account login alone is not enough.
-3. `make dmg` — when Developer ID is present, the script re-signs with Hardened Runtime and writes `dist/AFK-VERSION.dmg`.
+3. `make dmg` — when Developer ID is present, the script re-signs with Hardened Runtime **and** `Supporting/AFK.entitlements` (`device.audio-input`) and writes `dist/AFK-VERSION.dmg`.
 4. **Once**, store notary credentials in the Keychain (pick one method; interactive prompts are fine):
 
    ```bash

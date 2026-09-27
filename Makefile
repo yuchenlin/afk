@@ -51,9 +51,9 @@ build:
 	if [ "$$id" = "-" ] || [ -z "$$id" ]; then \
 		echo "⚠️  Signing ad-hoc — Accessibility/Mic will reset on every rebuild."; \
 		echo "   Run \`make dev-cert\` (or use an Apple Development identity), then \`make install\`."; \
-		codesign --force --sign - $(APP_BUNDLE); \
+		codesign --force --sign - --entitlements Supporting/AFK.entitlements $(APP_BUNDLE); \
 	else \
-		codesign --force --sign "$$id" $(APP_BUNDLE); \
+		codesign --force --sign "$$id" --entitlements Supporting/AFK.entitlements $(APP_BUNDLE); \
 		echo "✅ Signed with $$id"; \
 	fi
 	@echo "✅ Built $(APP_BUNDLE)"

@@ -35,7 +35,8 @@ DEV_ID_IDENTITY="$(
 
 if [[ -n "$DEV_ID_IDENTITY" ]]; then
   echo "🔏 Re-signing $APP_BUNDLE with $DEV_ID_IDENTITY (Hardened Runtime)…"
-  codesign --force --deep --options runtime --sign "$DEV_ID_IDENTITY" "$APP_BUNDLE"
+  ENTITLEMENTS="${ENTITLEMENTS:-Supporting/AFK.entitlements}"
+  codesign --force --deep --options runtime --entitlements "$ENTITLEMENTS" --sign "$DEV_ID_IDENTITY" "$APP_BUNDLE"
   SIGN_KIND="Developer ID"
 else
   echo "ℹ️  No \"Developer ID Application\" identity in the keychain."
@@ -88,8 +89,12 @@ echo ""
 echo "✅ Wrote $DMG_PATH ($(du -h "$DMG_PATH" | awk '{print $1}'))  [signing: $SIGN_KIND]"
 echo "   Signature on packaged app:"
 codesign -dv --verbose=4 "$APP_BUNDLE" 2>&1 \
-  | grep -E '^(Identifier|Authority|TeamIdentifier|Signature)=' \
+  | grep -E '^(Identifier|Authority|TeamIdentifier|Signature|Flags|Runtime)=' \
   || echo "   (unsigned / unknown)"
+echo "   Entitlements:"
+codesign -d --entitlements - "$APP_BUNDLE" 2>&1 \
+  | grep -v '^Executable=' \
+  || echo "   (none)"
 echo ""
 if [[ "$SIGN_KIND" != "Developer ID" ]]; then
   echo "⚠️  Gatekeeper: this DMG will NOT open cleanly on other Macs."
