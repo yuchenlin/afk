@@ -521,6 +521,9 @@ final class DictationSessionController: ObservableObject {
             if apiKey == nil, !useMock {
                 throw SpeechPipelineError.noAPIKey
             }
+            let lexicon = IOSVocabulary.load()
+            grok.keyterms = lexicon.keyTermsForStt
+            polisher.vocabulary = lexicon.keyTermsForStt
             let speech: SpeechTranscribing = useMock ? mock : grok
             var text = try await speech.transcribe(
                 pcm16: pcm,

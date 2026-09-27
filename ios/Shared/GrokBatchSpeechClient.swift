@@ -4,6 +4,8 @@ import Foundation
 /// Streaming WebSocket reuse of AFKCore is deferred until AFKKit extraction (Phase 0).
 public final class GrokBatchSpeechClient: SpeechTranscribing, @unchecked Sendable {
     public var host = "api.x.ai"
+    /// STT keyterms (≤100, each ≤50 chars) — same field Mac sends on batch + stream.
+    public var keyterms: [String] = []
     private let urlSession: URLSession
 
     public init(urlSession: URLSession = .shared) {
@@ -15,6 +17,7 @@ public final class GrokBatchSpeechClient: SpeechTranscribing, @unchecked Sendabl
         // ~0.2 s minimum (Mac uses the same threshold)
         guard pcm16.count > sampleRate * 2 / 5 else { throw SpeechPipelineError.emptyAudio }
 
+        let terms = Array(keyterms.filter { $0.count <= 50 }.prefix(100))
         let boundary = "afk-\(UUID().uuidString)"
         var request = URLRequest(url: URL(string: "https://\(host)/v1/stt")!)
         request.httpMethod = "POST"
@@ -30,6 +33,9 @@ public final class GrokBatchSpeechClient: SpeechTranscribing, @unchecked Sendabl
         field("model", model)
         field("audio_format", "pcm")
         field("sample_rate", String(sampleRate))
+        for term in terms {
+            field("keyterm", term)
+        }
         // API requires `file` to be the last field (same as Mac GrokBatchStt).
         body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"audio.pcm\"\r\nContent-Type: application/octet-stream\r\n\r\n".utf8))
         body.append(pcm16)

@@ -8,7 +8,7 @@ Architecture and review constraints: [`docs/PLAN.md`](../docs/PLAN.md), [`docs/R
 
 ```
 AFK host (SwiftUI)                     AFK Keyboard (UIInputViewController)
-  mic (per utterance) + playback keepalive Typeless-like voice-first UI (big mic)
+  mic (per utterance) + playback keepalive Typeless-like voice-first UI (AFK logo mic)
   Grok batch STT / mock + polish         press-and-hold / tap-to-speak via App Group
   settings (Keychain API key)            ABC / 中文 typing + 🌐; insertText on result
         └──── App Group `group.xyz.yuchenlin.afk` ────┘
@@ -67,7 +67,8 @@ Mock STT is **off by default**. Paste an xAI key in Settings for live `grok-voic
 | Keyboard voice-first + ABC/中文 typing + globe | ✅ Typeless-like |
 | Mic press-and-hold / tap-to-speak → App Group command + Darwin → unmute/mute armed engine → insertText | ✅ App Group only; never opens `afk://`; muted between holds |
 | Host unreachable / armed engine lost → in-keyboard "Open AFK once" CTA | ✅ only deliberate tap opens `afk://session` |
-| Full Mac Polisher / lexicon / streaming Grok | ❌ stub / simplified |
+| Full Mac Polisher / lexicon / streaming Grok | ⚠️ polish+keyterms aligned (build 12); streaming still deferred |
+| STT Mac↔iOS audit | ✅ [`docs/IOS_STT_AUDIT.md`](../docs/IOS_STT_AUDIT.md) |
 | Live Activity / Control Center / iCloud | ❌ TODO |
 | App Store assets / consent / privacy policy | ❌ not claimed |
 

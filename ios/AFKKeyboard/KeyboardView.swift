@@ -252,12 +252,13 @@ final class KeyboardView: UIView {
         holdHint.textAlignment = .center
         holdHint.text = "Hold to talk · or tap"
 
-        // Large white pill mic (Typeless)
+        // Logo-derived control (AFK face: eyes + waveform bars) — Typeless-sized pill
         micButton.translatesAutoresizingMaskIntoConstraints = false
         micButton.layer.cornerRadius = 28
         micButton.clipsToBounds = true
-        let micConfig = UIImage.SymbolConfiguration(pointSize: 28, weight: .semibold)
-        micButton.setImage(UIImage(systemName: "mic.fill", withConfiguration: micConfig), for: .normal)
+        let logo = AFKLogoGlyph.image(side: 34)
+        micButton.setImage(logo, for: .normal)
+        micButton.imageView?.contentMode = .scaleAspectFit
         micButton.tintColor = .black
         micButton.backgroundColor = .white
         micButton.accessibilityLabel = "Hold to talk, or tap to start and tap again to send"
@@ -540,8 +541,9 @@ final class KeyboardView: UIView {
     }
 
     private func styleMic(ready: Bool, recording: Bool) {
+        // Idle: white pill + black logo. Recording: orange (matches status / Typeless hold).
         if recording {
-            micButton.backgroundColor = .systemRed
+            micButton.backgroundColor = .systemOrange
             micButton.tintColor = .white
             micButton.transform = CGAffineTransform(scaleX: 1.02, y: 1.02)
         } else if ready {
@@ -550,7 +552,7 @@ final class KeyboardView: UIView {
             micButton.transform = .identity
         } else {
             micButton.backgroundColor = UIColor(white: 0.35, alpha: 1)
-            micButton.tintColor = UIColor(white: 0.75, alpha: 1)
+            micButton.tintColor = UIColor(white: 0.55, alpha: 1)
             micButton.transform = .identity
         }
     }
@@ -725,3 +727,37 @@ private final class WaveformView: UIView {
         }
     }
 }
+
+// MARK: - AFK logo glyph (from design/logo/afk-logo-*.svg)
+
+/// Eyes + five waveform bars — same geometry as `design/logo/afk-logo-light.svg`.
+/// Drawn as a template image so `tintColor` drives idle (black) vs recording (white).
+enum AFKLogoGlyph {
+    static func image(side: CGFloat) -> UIImage {
+        let size = CGSize(width: side, height: side)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let img = renderer.image { ctx in
+            let c = ctx.cgContext
+            UIColor.black.setFill()
+            let s = side / 1024
+            // Eyes
+            c.fillEllipse(in: CGRect(x: (402 - 48) * s, y: (380 - 48) * s, width: 96 * s, height: 96 * s))
+            c.fillEllipse(in: CGRect(x: (622 - 48) * s, y: (380 - 48) * s, width: 96 * s, height: 96 * s))
+            // Waveform mouth bars (x, y, w, h) from the SVG
+            let bars: [(CGFloat, CGFloat, CGFloat, CGFloat)] = [
+                (305, 578.3, 54, 70),
+                (395, 600.8, 54, 110),
+                (485, 605.0, 54, 130),
+                (575, 600.8, 54, 110),
+                (665, 578.3, 54, 70),
+            ]
+            for (x, y, w, h) in bars {
+                let rect = CGRect(x: x * s, y: y * s, width: w * s, height: h * s)
+                let path = UIBezierPath(roundedRect: rect, cornerRadius: 27 * s)
+                path.fill()
+            }
+        }
+        return img.withRenderingMode(.alwaysTemplate)
+    }
+}
+

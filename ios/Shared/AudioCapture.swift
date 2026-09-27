@@ -159,6 +159,8 @@ public final class AudioCapture {
         ), let converter = AVAudioConverter(from: inputFormat, to: targetFormat) else {
             throw CaptureError.engineStart("Could not create 16 kHz PCM converter")
         }
+        // Match Mac AudioRecorder: downmix multi-channel device input to mono.
+        converter.downmix = true
         input.installTap(
             onBus: 0,
             bufferSize: 1024,
