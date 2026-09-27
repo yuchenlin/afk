@@ -58,6 +58,7 @@ final class KeyboardViewController: UIInputViewController {
         super.viewWillAppear(animated)
         activeCTA = nil
         refreshFullAccessState()
+        keyboardView.reloadPolishFromDefaults()
         refreshChrome()
         consumeResultIfNeeded()
         startPolling()

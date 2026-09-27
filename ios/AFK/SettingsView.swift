@@ -126,6 +126,8 @@ struct SettingsView: View {
                 }
             }
             .onAppear {
+                // Keyboard polish toggle writes App Group; pick it up when Settings opens.
+                session.settings = IOSSettings.load()
                 _ = IOSVocabulary.pullFromiCloudIfNewer()
                 vocabularyText = IOSVocabulary.loadText()
             }

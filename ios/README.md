@@ -71,6 +71,8 @@ Mock STT is **off by default**. Paste an xAI key in Settings for live `grok-voic
 | STT Mac↔iOS audit | ✅ [`docs/IOS_STT_AUDIT.md`](../docs/IOS_STT_AUDIT.md) |
 | Live Activity / Control Center | ❌ TODO |
 | Vocabulary iCloud KVS sync (Mac ↔ iOS) | ✅ build 14 (`afk.vocabularyText`, LWW) |
+| Keyboard AI polish toggle (App Group) | ✅ build 15 (wand button; host reloads each utterance) |
+| 中文 PinyinIME multi-syllable / greedy | ✅ build 15 (compact lexicon; not a full IME) |
 | App Store assets / consent / privacy policy | ❌ not claimed |
 
 ## Regenerate project

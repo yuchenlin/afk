@@ -525,7 +525,8 @@ final class DictationSessionController: ObservableObject {
 
     private func transcribe(_ pcm: Data) async {
         do {
-            // Reload so Keychain / App Group migrations apply even if Settings sheet wasn't opened.
+            // Reload from App Group each utterance so keyboard polish toggle (and Settings)
+            // apply on the next dictation without requiring a host restart.
             let settings = IOSSettings.load()
             self.settings = settings
             let apiKey = KeychainStore.readAPIKey()

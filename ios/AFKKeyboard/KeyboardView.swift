@@ -67,7 +67,9 @@ final class KeyboardView: UIView {
 
     // Shared bottom bar pieces rebuilt per mode
     private var pinyinBuffer = ""
-    private var candidates: [String] = []
+    private var candidates: [PinyinIME.Candidate] = []
+    /// Cached polish toggle from App Group (`IOSSettings.polishEnabled`).
+    private var polishEnabled = true
 
     /// Mic gesture: touch-down starts at once (no pre-roll exists, so waiting would clip the
     /// first syllable). Release after `holdThreshold` = hold-to-talk → stop. A shorter touch
@@ -280,7 +282,7 @@ final class KeyboardView: UIView {
 
         // Bottom chrome: AI · return · backspace / globe · @
         voiceBottom.translatesAutoresizingMaskIntoConstraints = false
-        styleRoundChrome(voiceAIBtn, systemName: "pencil.and.outline")
+        styleRoundChrome(voiceAIBtn, systemName: "wand.and.stars")
         styleRoundChrome(voiceGlobe, systemName: "globe")
         styleRoundChrome(voiceBackspace, systemName: "delete.left.fill")
         styleRoundChrome(voiceAt, title: "@")
@@ -288,7 +290,9 @@ final class KeyboardView: UIView {
         voiceReturn.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
         voiceReturn.layer.cornerRadius = 22
         voiceReturn.translatesAutoresizingMaskIntoConstraints = false
-        voiceAIBtn.addAction(UIAction { [weak self] _ in self?.flash("AI polish runs in the AFK host") }, for: .touchUpInside)
+        voiceAIBtn.accessibilityLabel = "AI polish"
+        voiceAIBtn.accessibilityHint = "Toggle polishing transcribed text in the AFK host"
+        voiceAIBtn.addAction(UIAction { [weak self] _ in self?.togglePolish() }, for: .touchUpInside)
         voiceGlobe.addAction(UIAction { [weak self] _ in self?.delegate?.keyboardNextKeyboard() }, for: .touchUpInside)
         voiceBackspace.addAction(UIAction { [weak self] _ in self?.delegate?.keyboardDelete() }, for: .touchUpInside)
         voiceAt.addAction(UIAction { [weak self] _ in self?.delegate?.keyboardInsert("@") }, for: .touchUpInside)
@@ -354,6 +358,7 @@ final class KeyboardView: UIView {
             waveform.widthAnchor.constraint(equalTo: voiceStack.widthAnchor, multiplier: 0.55),
             waveform.heightAnchor.constraint(equalToConstant: 28),
         ])
+        refreshPolishButton()
     }
 
     private func applyCTA(_ cta: HostCTA?) {
@@ -452,6 +457,7 @@ final class KeyboardView: UIView {
         case .voice:
             surface = voiceStack
             clearPinyin()
+            refreshPolishButton()
         case .typingEN, .typingCN:
             rebuildTypingKeys()
             surface = typingStack
@@ -582,11 +588,12 @@ final class KeyboardView: UIView {
         ctaButton.tintColor = p.chromeFg
         ctaButton.setTitleColor(p.chromeFg, for: .normal)
 
-        for btn in [voiceAIBtn, voiceGlobe, voiceBackspace, voiceAt] {
+        for btn in [voiceGlobe, voiceBackspace, voiceAt] {
             btn.backgroundColor = p.chromeFill
             btn.tintColor = p.chromeFg
             btn.setTitleColor(p.chromeFg, for: .normal)
         }
+        refreshPolishButton()
         refreshModeChips()
         styleMic(ready: micReady, recording: micRecording)
     }
@@ -694,23 +701,68 @@ final class KeyboardView: UIView {
             buf.textColor = .secondaryLabel
             candidateRow.addArrangedSubview(buf)
         }
-        for word in candidates {
+        for match in candidates {
             var config = UIButton.Configuration.plain()
-            config.title = word
+            config.title = match.text
             config.baseForegroundColor = .label
             config.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10)
             let button = UIButton(configuration: config)
             button.backgroundColor = .systemBackground
             button.layer.cornerRadius = 8
-            button.addAction(UIAction { [weak self] _ in self?.selectCandidate(word) }, for: .touchUpInside)
+            button.addAction(UIAction { [weak self] _ in self?.selectCandidate(match) }, for: .touchUpInside)
             candidateRow.addArrangedSubview(button)
         }
         candidateScroll.isHidden = mode != .typingCN
     }
 
-    private func selectCandidate(_ word: String) {
-        delegate?.keyboardInsert(word)
-        clearPinyin()
+    /// Insert candidate text; consume only the matched pinyin prefix (leave suffix when possible).
+    private func selectCandidate(_ match: PinyinIME.Candidate) {
+        delegate?.keyboardInsert(match.text)
+        let key = pinyinBuffer.lowercased().filter { $0.isLetter }
+        let consumed = min(match.consumed, key.count)
+        if consumed >= key.count {
+            clearPinyin()
+        } else {
+            // Drop the same number of leading letters from the live buffer.
+            var left = consumed
+            var idx = pinyinBuffer.startIndex
+            while left > 0, idx < pinyinBuffer.endIndex {
+                if pinyinBuffer[idx].isLetter { left -= 1 }
+                idx = pinyinBuffer.index(after: idx)
+            }
+            pinyinBuffer = String(pinyinBuffer[idx...])
+            refreshCandidates()
+        }
+    }
+
+    /// Voice chrome: on/off for `IOSSettings.polishEnabled` (App Group). Host reloads on next utterance.
+    private func togglePolish() {
+        var settings = IOSSettings.load()
+        settings.polishEnabled.toggle()
+        settings.save()
+        polishEnabled = settings.polishEnabled
+        refreshPolishButton()
+        flash(polishEnabled ? "AI polish on" : "AI polish off")
+    }
+
+    func reloadPolishFromDefaults() {
+        refreshPolishButton()
+    }
+
+    private func refreshPolishButton() {
+        polishEnabled = IOSSettings.load().polishEnabled
+        let on = polishEnabled
+        let p = palette
+        voiceAIBtn.backgroundColor = on ? .systemBlue : p.chromeFill
+        voiceAIBtn.tintColor = on ? .white : p.chromeFg
+        voiceAIBtn.setTitleColor(on ? .white : p.chromeFg, for: .normal)
+        let cfg = UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+        let symbol = on ? "wand.and.stars" : "wand.and.stars"
+        voiceAIBtn.setImage(UIImage(systemName: symbol, withConfiguration: cfg), for: .normal)
+        // Dim the glyph slightly when off so selected/unselected is obvious beyond fill.
+        voiceAIBtn.alpha = on ? 1.0 : 0.85
+        voiceAIBtn.accessibilityValue = on ? "On" : "Off"
+        voiceAIBtn.accessibilityLabel = on ? "AI polish on" : "AI polish off"
     }
 
     private func commitPinyinRaw() {
