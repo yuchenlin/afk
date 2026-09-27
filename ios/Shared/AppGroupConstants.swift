@@ -59,8 +59,8 @@ public enum AppGroupConstants {
     public static let noteSessionChanged = "xyz.yuchenlin.afk.ios.sessionChanged"
     public static let noteOpenHost = "xyz.yuchenlin.afk.ios.openHost"
 
-    /// URL scheme registered by the host (Info.plist). Keyboard opens this when the
-    /// host heartbeat is stale so iOS can wake / foreground AFK briefly.
+    /// URL scheme registered by the host (Info.plist). Keyboard opens this only from
+    /// a deliberate in-keyboard CTA tap ("Open AFK once…") — never automatically on mic.
     public static let urlScheme = "afk"
     public static let urlHostWake = "wake"
     public static let urlHostRecord = "record"

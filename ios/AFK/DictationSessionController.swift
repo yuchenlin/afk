@@ -113,7 +113,7 @@ final class DictationSessionController: ObservableObject {
 
         // Silent looping audio is what actually keeps us unsuspended under UIBackgroundModes:audio.
         startKeepaliveIfNeeded()
-        relay.touchHostHeartbeat(alive: true)
+        relay.touchHostHeartbeat(alive: true, flush: true)
 
         if !restartTimerOnly {
             // Soft keepalive beep intentionally omitted — SessionKeepalive is the real assertion.
@@ -156,6 +156,17 @@ final class DictationSessionController: ObservableObject {
         if host == AppGroupConstants.urlHostRecord, !isRecording {
             Task { try? await startRecordingFromKeyboard() }
         }
+    }
+
+    /// Host became foreground — republish liveness right away so the keyboard sees
+    /// `.ready` without waiting for the 1 Hz session timer, and drain a queued command.
+    func noteBecameActive() {
+        guard isSessionActive || relay.isSessionActive else { return }
+        relay.touchHostHeartbeat(alive: true, flush: true)
+        if !isRecording {
+            beginSession(restartTimerOnly: true)
+        }
+        pollKeyboardCommand()
     }
 
     private func startKeepaliveIfNeeded() {

@@ -13,9 +13,9 @@ struct AFKApp: App {
                     session.handleOpenURL(url)
                 }
                 .onChange(of: scenePhase) { _, phase in
-                    // Re-assert keepalive when returning to foreground mid-session.
-                    if phase == .active, session.isSessionActive, !session.isRecording {
-                        session.beginSession(restartTimerOnly: true)
+                    // Re-assert keepalive + heartbeat when returning to foreground mid-session.
+                    if phase == .active {
+                        session.noteBecameActive()
                     }
                 }
         }

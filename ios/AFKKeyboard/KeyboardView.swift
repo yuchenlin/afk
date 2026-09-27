@@ -15,6 +15,8 @@ protocol KeyboardViewDelegate: AnyObject {
     func keyboardSwitchToVoice()
     func keyboardSwitchToTypingEN()
     func keyboardSwitchToTypingCN()
+    /// Deliberate CTA — only path that may open the AFK host from the keyboard.
+    func keyboardOpenHostTapped(_ cta: HostCTA)
 }
 
 enum KeyboardSurfaceMode {
@@ -46,6 +48,9 @@ final class KeyboardView: UIView {
     private let micButton = UIButton(type: .custom)
     private let waveform = WaveformView()
     private let holdHint = UILabel()
+    private let ctaButton = UIButton(type: .system)
+    /// CTA the button currently represents; the tap carries it so the button is never dead.
+    private var shownCTA: HostCTA?
     private let voiceBottom = UIView()
     private let voiceReturn = UIButton(type: .system)
     private let voiceAIBtn = UIButton(type: .system)
@@ -94,7 +99,8 @@ final class KeyboardView: UIView {
         needsFullAccess: Bool,
         level: Float,
         hostStatus: String,
-        hostAlive: Bool = true
+        health: SessionRelay.HostHealth = .ready,
+        cta: HostCTA? = nil
     ) {
         waveform.level = recording ? level : 0
         waveform.isHidden = !recording || mode != .voice
@@ -104,26 +110,39 @@ final class KeyboardView: UIView {
             statusLabel.textColor = .systemOrange
             styleMic(ready: false, recording: false)
             holdHint.text = "Enable Full Access"
+            applyCTA(nil)
         } else if recording {
             statusLabel.text = hostStatus.isEmpty ? "Listening… release to send" : hostStatus
             statusLabel.textColor = .systemRed
             styleMic(ready: true, recording: true)
-        } else if sessionOn, !hostAlive {
-            statusLabel.text = "Session flagged on · host suspended — tap mic to wake AFK"
+            holdHint.text = "Listening… release to send"
+            applyCTA(nil)
+        } else if sessionOn, health == .down {
+            statusLabel.text = "Session paused · open AFK once to resume"
             statusLabel.textColor = .systemOrange
-            styleMic(ready: true, recording: false)
-            holdHint.text = "Tap to wake AFK"
-        } else if sessionOn {
-            let base = hostStatus.isEmpty ? "Session on · hold mic to talk" : hostStatus
-            statusLabel.text = hostAlive ? base : base
+            styleMic(ready: false, recording: false)
+            holdHint.text = "Open AFK to resume"
+            applyCTA(cta ?? .sessionExpired)
+        } else if sessionOn, health == .degraded {
+            let base = hostStatus.isEmpty ? "Session on · waking…" : hostStatus
+            statusLabel.text = base
             statusLabel.textColor = UIColor(white: 0.65, alpha: 1)
             styleMic(ready: true, recording: false)
             holdHint.text = "Tap to speak"
+            applyCTA(cta)
+        } else if sessionOn {
+            let base = hostStatus.isEmpty ? "Session on · hold mic to talk" : hostStatus
+            statusLabel.text = base
+            statusLabel.textColor = UIColor(white: 0.65, alpha: 1)
+            styleMic(ready: true, recording: false)
+            holdHint.text = "Tap to speak"
+            applyCTA(cta)
         } else {
             statusLabel.text = "No session · open AFK → Start dictation session"
             statusLabel.textColor = .systemOrange
             styleMic(ready: false, recording: false)
-            holdHint.text = "Start session in AFK"
+            holdHint.text = "Open AFK once"
+            applyCTA(cta ?? .startSession)
         }
     }
 
@@ -283,7 +302,27 @@ final class KeyboardView: UIView {
             voiceBottom.heightAnchor.constraint(equalToConstant: 100),
         ])
 
-        let micWrap = UIStackView(arrangedSubviews: [holdHint, micButton, waveform])
+        ctaButton.translatesAutoresizingMaskIntoConstraints = false
+        ctaButton.backgroundColor = UIColor(white: 0.22, alpha: 1)
+        ctaButton.layer.cornerRadius = 18
+        ctaButton.tintColor = .white
+        ctaButton.setTitleColor(.white, for: .normal)
+        ctaButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+        ctaButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        ctaButton.titleLabel?.minimumScaleFactor = 0.75
+        ctaButton.titleLabel?.lineBreakMode = .byTruncatingTail
+        ctaButton.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
+        let ctaCfg = UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        ctaButton.setImage(UIImage(systemName: "arrow.up.forward.app", withConfiguration: ctaCfg), for: .normal)
+        ctaButton.accessibilityLabel = "Open AFK to start a dictation session"
+        ctaButton.accessibilityHint = "Opens the AFK app once; afterwards dictation stays in this app."
+        ctaButton.isHidden = true
+        ctaButton.addAction(UIAction { [weak self] _ in
+            guard let self, let cta = self.shownCTA else { return }
+            self.delegate?.keyboardOpenHostTapped(cta)
+        }, for: .touchUpInside)
+
+        let micWrap = UIStackView(arrangedSubviews: [ctaButton, holdHint, micButton, waveform])
         micWrap.axis = .vertical
         micWrap.alignment = .center
         micWrap.spacing = 12
@@ -293,11 +332,25 @@ final class KeyboardView: UIView {
         voiceStack.addArrangedSubview(voiceBottom)
 
         NSLayoutConstraint.activate([
+            ctaButton.heightAnchor.constraint(equalToConstant: 36),
+            ctaButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
+            ctaButton.widthAnchor.constraint(lessThanOrEqualTo: voiceStack.widthAnchor, multiplier: 0.96),
             micButton.widthAnchor.constraint(equalTo: voiceStack.widthAnchor, multiplier: 0.72),
             micButton.heightAnchor.constraint(equalToConstant: 56),
             waveform.widthAnchor.constraint(equalTo: voiceStack.widthAnchor, multiplier: 0.55),
             waveform.heightAnchor.constraint(equalToConstant: 28),
         ])
+    }
+
+    private func applyCTA(_ cta: HostCTA?) {
+        shownCTA = cta
+        guard let cta else {
+            ctaButton.isHidden = true
+            return
+        }
+        ctaButton.setTitle("  " + cta.title, for: .normal)
+        ctaButton.accessibilityLabel = cta.title
+        ctaButton.isHidden = mode != .voice
     }
 
     private func makeModeChip(title: String? = nil, systemName: String? = nil, selected: Bool) -> UIButton {

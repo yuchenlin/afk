@@ -39,7 +39,9 @@ Or open `AFK-iOS.xcodeproj` directly if already generated.
 5. On device: Settings → General → Keyboard → Keyboards → Add **AFK** → enable **Allow Full Access**.
 6. In the AFK app: grant mic → **Start dictation session** → switch to AFK Keyboard. Default UI is voice (hold mic to talk / release to send, or tap to toggle). Use **ABC** / **中文** for typing; **🌐** for the next system keyboard.
 
-**Mic does nothing / jumps to AFK?** Usually the host was suspended or keepalive failed. Build 6 added a near-silent loop + heartbeat; **build 7** keeps the session **mixable** (`.mixWithOthers`) for both keepalive and capture so background reactivation no longer throws OSStatus `560557684` (`!int` = CannotInterruptOthers). Capture no longer switches to a non-mixable `.duckOthers` category. The keyboard still opens `afk://` only if the host heartbeat is stale.
+**Mic does nothing?** Usually the host was suspended or keepalive failed. Build 6 added a near-silent loop + heartbeat; **build 7** keeps the session **mixable** (`.mixWithOthers`) for both keepalive and capture so background reactivation no longer throws OSStatus `560557684` (`!int` = CannotInterruptOthers). Capture no longer switches to a non-mixable `.duckOthers` category.
+
+**The keyboard never jumps to AFK on its own.** As of **build 9** the mic talks to the host through the App Group alone — no `afk://` open, no foregrounding — so dictation stays in Messages/Notes/whatever you are typing in. The heartbeat is graded: `ready` (≤4 s) and `degraded` (≤10 s) both send the start command optimistically; `down` disables the mic and shows an **in-keyboard CTA button** ("Open AFK once to start session" / "Session expired — open AFK"). Tapping that button is the only path that opens `afk://`.
 
 Mock STT is **off by default**. Paste an xAI key in Settings for live `grok-voice-transcribe-2.0` batch STT. With a key saved, the session path always uses Grok (never the Chinese mock string). Enable Mock STT only for offline / no-key smoke tests.
 
@@ -52,7 +54,8 @@ Mock STT is **off by default**. Paste an xAI key in Settings for live `grok-voic
 | Host record → mock / Grok batch STT → App Group | ✅ (streaming STT deferred) |
 | Background audio session keepalive | ✅ near-silent mixable loop + host heartbeat (`UIBackgroundModes: audio`) |
 | Keyboard voice-first + ABC/中文 typing + globe | ✅ Typeless-like |
-| Mic hold/tap → App Group command + Darwin → insertText | ✅ (+ host-alive check, `afk://` wake) |
+| Mic hold/tap → App Group command + Darwin → insertText | ✅ App Group only; never opens `afk://` |
+| Host unreachable → in-keyboard "Open AFK once" CTA | ✅ only deliberate tap opens `afk://` |
 | Full Mac Polisher / lexicon / streaming Grok | ❌ stub / simplified |
 | Live Activity / Control Center / iCloud | ❌ TODO |
 | App Store assets / consent / privacy policy | ❌ not claimed |

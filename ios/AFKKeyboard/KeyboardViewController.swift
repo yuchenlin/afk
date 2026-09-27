@@ -1,6 +1,8 @@
 import UIKit
 
 /// AFK Keyboard — Typeless-like voice-first UI; typing via ABC / 中文; host records via App Group.
+/// Mic never opens `afk://` / foregrounds the host. Session/keepalive must already be running;
+/// otherwise an in-keyboard CTA asks the user to open AFK once.
 final class KeyboardViewController: UIInputViewController {
     private var keyboardView: KeyboardView!
     private let relay = SessionRelay.shared
@@ -13,7 +15,9 @@ final class KeyboardViewController: UIInputViewController {
     private var lastInsertedResultID: String?
     private var pendingStartCommandID: String?
     private var startWatchDeadline: Date?
-    private var didOfferHostWake = false
+    /// In-keyboard CTA only; mic path never auto-opens the host.
+    private var activeCTA: HostCTA?
+    private var lastCTAOpenAt: Date?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -50,7 +54,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        didOfferHostWake = false
+        activeCTA = nil
         refreshFullAccessState()
         refreshChrome()
         consumeResultIfNeeded()
@@ -91,14 +95,31 @@ final class KeyboardViewController: UIInputViewController {
         let recording = relay.isRecording
         let level = relay.recordingLevel
         let hostStatus = relay.statusMessage
-        let hostAlive = relay.isHostHeartbeatFresh()
+        let health = relay.hostHealth()
+
+        // Clear CTA once host is healthy again.
+        if sessionOn, health == .ready {
+            activeCTA = nil
+        } else if !sessionOn {
+            activeCTA = canUseAppGroup ? .startSession : nil
+        } else if health == .down {
+            if activeCTA == nil || activeCTA == .startSession {
+                activeCTA = .sessionExpired
+            }
+            if awaitingResult {
+                awaitingResult = false
+                keyboardView.flash("AFK stopped — reopen to resume")
+            }
+        }
+
         keyboardView.setStatus(
             sessionOn: sessionOn,
             recording: recording,
             needsFullAccess: needsFullAccessBanner,
             level: level,
             hostStatus: hostStatus,
-            hostAlive: hostAlive
+            health: health,
+            cta: needsFullAccessBanner ? nil : activeCTA
         )
         if recording {
             keyboardView.setPreview("Listening…")
@@ -134,34 +155,34 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
-    /// After posting start, confirm host actually began recording; otherwise surface failure + wake host.
+    /// After posting start, confirm host actually began recording; never auto-open host.
     private func watchPendingStart() {
         guard let deadline = startWatchDeadline, let cmdID = pendingStartCommandID else { return }
         if relay.isRecording {
             pendingStartCommandID = nil
             startWatchDeadline = nil
-            didOfferHostWake = false
+            activeCTA = nil
             return
         }
         // Host consumed our command but recording never flipped — still treat as progress.
-        if relay.lastConsumedCommandID == cmdID, relay.isHostHeartbeatFresh() {
-            // Give capture a moment after consume.
+        if relay.lastConsumedCommandID == cmdID, relay.hostHealth() != .down {
             if Date() < deadline { return }
         }
         guard Date() >= deadline else { return }
 
         pendingStartCommandID = nil
         startWatchDeadline = nil
+        relay.clearPendingCommand()
 
-        let hostAlive = relay.isHostHeartbeatFresh()
-        if !hostAlive {
-            keyboardView.flash("Host suspended — opening AFK…")
-            keyboardView.setPreview("Host not running · open AFK")
-            wakeHost(path: AppGroupConstants.urlHostWake)
+        let health = relay.hostHealth()
+        if health == .down {
+            keyboardView.flash("AFK session stopped")
+            keyboardView.setPreview("Open AFK once to resume")
+            activeCTA = .sessionExpired
         } else {
             keyboardView.flash("Host did not start mic")
-            keyboardView.setPreview("Host alive but mic did not start")
-            wakeHost(path: AppGroupConstants.urlHostRecord)
+            keyboardView.setPreview("Open AFK to fix mic")
+            activeCTA = .recoverHost
         }
         refreshChrome()
     }
@@ -172,30 +193,40 @@ final class KeyboardViewController: UIInputViewController {
             return
         }
         if !relay.isSessionActive {
-            keyboardView.flash("No session — opening AFK…")
+            activeCTA = .startSession
+            keyboardView.flash("Open AFK once to start a session")
             keyboardView.setPreview("Start session in AFK")
-            wakeHost(path: AppGroupConstants.urlHostSession)
-            DarwinNotify.post(AppGroupConstants.noteOpenHost)
+            refreshChrome()
             return
         }
-        if !relay.isHostHeartbeatFresh() {
-            keyboardView.flash("Host asleep — opening AFK…")
-            keyboardView.setPreview("Session flag on, host not alive")
-            wakeHost(path: AppGroupConstants.urlHostWake)
-            // Still post the command so a freshly woken host can drain it.
+        let health = relay.hostHealth()
+        if health == .down {
+            activeCTA = .sessionExpired
+            keyboardView.flash("Session paused — open AFK once")
+            keyboardView.setPreview("Open AFK to resume")
+            refreshChrome()
+            return
         }
+        // .ready or .degraded: App Group only — never openURL.
         if relay.isRecording { return }
         let id = relay.postCommand(.start)
         pendingStartCommandID = id
         startWatchDeadline = Date().addingTimeInterval(1.2)
-        keyboardView.flash("Listening…")
+        if health == .degraded {
+            keyboardView.flash("Waking session…")
+        } else {
+            keyboardView.flash("Listening…")
+        }
         awaitingResult = false
+        activeCTA = nil
         refreshChrome()
     }
 
     private func requestStopRecording() {
         guard canUseAppGroup else { return }
-        // Always post stop on release — host no-ops if not recording.
+        // Nothing was ever started (mic held while the host was down) — do not
+        // queue a stray stop or claim we are transcribing.
+        guard relay.isRecording || pendingStartCommandID != nil else { return }
         _ = relay.postCommand(.stop)
         awaitingResult = true
         pendingStartCommandID = nil
@@ -211,10 +242,10 @@ final class KeyboardViewController: UIInputViewController {
             return
         }
         if !relay.isSessionActive {
-            keyboardView.flash("No session — opening AFK…")
+            activeCTA = .startSession
+            keyboardView.flash("Open AFK once to start a session")
             keyboardView.setPreview("Start session in AFK")
-            wakeHost(path: AppGroupConstants.urlHostSession)
-            DarwinNotify.post(AppGroupConstants.noteOpenHost)
+            refreshChrome()
             return
         }
         if relay.isRecording {
@@ -224,17 +255,14 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
-    /// Open the host via URL scheme (Full Access). Wakes a suspended AFK so keepalive can resume.
-    private func wakeHost(path: String) {
+    /// Deliberate CTA tap only — the sole keyboard path that may open `afk://`.
+    private func openHostFromCTA(_ cta: HostCTA) {
         guard canUseAppGroup else { return }
-        if didOfferHostWake { return }
-        didOfferHostWake = true
-        guard let url = URL(string: "\(AppGroupConstants.urlScheme)://\(path)") else { return }
+        if let last = lastCTAOpenAt, Date().timeIntervalSince(last) < 1.5 { return }
+        lastCTAOpenAt = Date()
+        guard let url = URL(string: "\(AppGroupConstants.urlScheme)://\(cta.urlPath)") else { return }
+        keyboardView.flash("Opening AFK…")
         openURLFromExtension(url)
-        // Allow another wake attempt after a few seconds if user retries mic.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
-            self?.didOfferHostWake = false
-        }
     }
 
     private func openURLFromExtension(_ url: URL) {
@@ -301,6 +329,10 @@ extension KeyboardViewController: KeyboardViewDelegate {
 
     func keyboardMicTapped() {
         toggleRecording()
+    }
+
+    func keyboardOpenHostTapped(_ cta: HostCTA) {
+        openHostFromCTA(cta)
     }
 
     func keyboardSwitchToVoice() {

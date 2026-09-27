@@ -26,6 +26,16 @@ public final class SessionRelay {
         case stop
     }
 
+    /// Keyboard view of host liveness from App Group heartbeat.
+    public enum HostHealth: Equatable {
+        /// Heartbeat within readyAge (default 4s).
+        case ready
+        /// Heartbeat stale but not dead (4–10s) — optimistic command OK.
+        case degraded
+        /// No heartbeat / hostAlive false / older than downAge.
+        case down
+    }
+
     public init(suiteName: String = AppGroupConstants.suiteName) {
         self.suiteName = suiteName
         let resolved = Self.resolve(suiteName: suiteName)
@@ -120,12 +130,22 @@ public final class SessionRelay {
     }
 
     /// Host: take the next unconsumed keyboard command, if any.
-    public func consumeCommand() -> (id: String, command: Command)? {
+    /// Drops commands older than `maxAge` so a start posted while the host was dead
+    /// does not fire minutes later when the user opens AFK for an unrelated reason.
+    public func consumeCommand(maxAge: TimeInterval = 8) -> (id: String, command: Command)? {
         guard let id = defaults.string(forKey: AppGroupConstants.commandIDKey), !id.isEmpty else {
             return nil
         }
         let last = defaults.string(forKey: AppGroupConstants.lastConsumedCommandIDKey)
         guard id != last else { return nil }
+        let at = defaults.double(forKey: AppGroupConstants.commandAtKey)
+        if at > 0, Date().timeIntervalSince1970 - at > maxAge {
+            defaults.set(id, forKey: AppGroupConstants.lastConsumedCommandIDKey)
+            defaults.removeObject(forKey: AppGroupConstants.commandActionKey)
+            defaults.removeObject(forKey: AppGroupConstants.commandIDKey)
+            defaults.synchronize()
+            return nil
+        }
         guard let raw = defaults.string(forKey: AppGroupConstants.commandActionKey),
               let command = Command(rawValue: raw) else {
             return nil
@@ -134,6 +154,14 @@ public final class SessionRelay {
         defaults.removeObject(forKey: AppGroupConstants.commandActionKey)
         defaults.synchronize()
         return (id, command)
+    }
+
+    /// Keyboard: abandon a start/stop that the host never consumed.
+    public func clearPendingCommand() {
+        defaults.removeObject(forKey: AppGroupConstants.commandActionKey)
+        defaults.removeObject(forKey: AppGroupConstants.commandIDKey)
+        defaults.removeObject(forKey: AppGroupConstants.commandAtKey)
+        defaults.synchronize()
     }
 
     public func publishResult(_ text: String) {
@@ -173,10 +201,12 @@ public final class SessionRelay {
     }
 
     /// Host: mark process as alive (called from session timer / keepalive).
-    public func touchHostHeartbeat(alive: Bool = true) {
+    /// `flush` forces the shared suite out so the keyboard process sees it at once;
+    /// the 1 Hz timer path leaves it off because the write is high-frequency.
+    public func touchHostHeartbeat(alive: Bool = true, flush: Bool = false) {
         defaults.set(alive, forKey: AppGroupConstants.hostAliveKey)
         defaults.set(Date().timeIntervalSince1970, forKey: AppGroupConstants.hostHeartbeatAtKey)
-        // High-frequency — no synchronize / Darwin.
+        if flush { defaults.synchronize() }
     }
 
     public func clearHostHeartbeat() {
@@ -187,10 +217,18 @@ public final class SessionRelay {
 
     /// Keyboard: true if host wrote a heartbeat within `maxAge` seconds.
     public func isHostHeartbeatFresh(maxAge: TimeInterval = 3.0) -> Bool {
-        guard defaults.bool(forKey: AppGroupConstants.hostAliveKey) else { return false }
+        hostHealth(readyAge: maxAge, downAge: maxAge) == .ready
+    }
+
+    /// Graded host liveness for the keyboard CTA / mic gate.
+    public func hostHealth(readyAge: TimeInterval = 4.0, downAge: TimeInterval = 10.0) -> HostHealth {
+        guard defaults.bool(forKey: AppGroupConstants.hostAliveKey) else { return .down }
         let t = defaults.double(forKey: AppGroupConstants.hostHeartbeatAtKey)
-        guard t > 0 else { return false }
-        return Date().timeIntervalSince1970 - t <= maxAge
+        guard t > 0 else { return .down }
+        let age = Date().timeIntervalSince1970 - t
+        if age <= readyAge { return .ready }
+        if age <= downAge { return .degraded }
+        return .down
     }
 
     public var pendingCommandID: String? {
@@ -201,3 +239,27 @@ public final class SessionRelay {
         defaults.string(forKey: AppGroupConstants.lastConsumedCommandIDKey)
     }
 }
+
+/// In-keyboard call-to-action when the host session/keepalive is not ready.
+/// Mic never opens the host; only a deliberate tap on this CTA may.
+public enum HostCTA: Equatable {
+    case startSession
+    case sessionExpired
+    case recoverHost
+
+    public var title: String {
+        switch self {
+        case .startSession: return "Open AFK once to start session"
+        case .sessionExpired: return "Session expired — open AFK"
+        case .recoverHost: return "Open AFK to fix mic"
+        }
+    }
+
+    public var urlPath: String {
+        switch self {
+        case .startSession: return AppGroupConstants.urlHostSession
+        case .sessionExpired, .recoverHost: return AppGroupConstants.urlHostWake
+        }
+    }
+}
+
