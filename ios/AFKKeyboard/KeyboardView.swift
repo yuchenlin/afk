@@ -195,12 +195,12 @@ final class KeyboardView: UIView {
         }
     }
 
-    func flash(_ message: String) {
+    func flash(_ message: String, duration: TimeInterval = 1.4) {
         let previous = statusLabel.text
         let previousColor = statusLabel.textColor
         statusLabel.text = message
         statusLabel.textColor = .label
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
             guard let self, self.statusLabel.text == message else { return }
             self.statusLabel.text = previous
             self.statusLabel.textColor = previousColor
@@ -776,7 +776,12 @@ final class KeyboardView: UIView {
         settings.save()
         polishEnabled = settings.polishEnabled
         refreshPolishButton()
-        flash(polishEnabled ? "AI polish on" : "AI polish off")
+        // Keep this explanatory status visible longer than routine flashes so the
+        // toggle's effect is clear without delaying or changing mic behavior.
+        let message = polishEnabled
+            ? "AI polish ON — cleans up transcript after you speak"
+            : "AI polish OFF — raw transcript only"
+        flash(message, duration: 3.0)
     }
 
     func reloadPolishFromDefaults() {
