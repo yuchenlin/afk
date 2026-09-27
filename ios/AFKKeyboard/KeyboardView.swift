@@ -16,6 +16,8 @@ protocol KeyboardViewDelegate: AnyObject {
     func keyboardSwitchToTypingCN()
     /// Deliberate CTA — only path that may open the AFK host from the keyboard.
     func keyboardOpenHostTapped(_ cta: HostCTA)
+    /// Explicit insert of a dictation result that auto-insert missed (tap fallback).
+    func keyboardInsertPendingResultTapped()
 }
 
 enum KeyboardSurfaceMode {
@@ -48,6 +50,7 @@ final class KeyboardView: UIView {
     private let waveform = WaveformView()
     private let holdHint = UILabel()
     private let ctaButton = UIButton(type: .system)
+    private let pendingInsertButton = UIButton(type: .system)
     /// CTA the button currently represents; the tap carries it so the button is never dead.
     private var shownCTA: HostCTA?
     private let voiceBottom = UIView()
@@ -176,6 +179,19 @@ final class KeyboardView: UIView {
         } else {
             previewLabel.text = nil
             previewLabel.isHidden = true
+        }
+    }
+
+    /// Show/hide the "Insert result" button when auto `insertText` could not run.
+    func setPendingInsert(_ text: String?) {
+        if let text, !text.isEmpty {
+            pendingInsertButton.setTitle("  Insert result", for: .normal)
+            pendingInsertButton.accessibilityLabel = "Insert dictation result"
+            pendingInsertButton.accessibilityValue = text
+            pendingInsertButton.isHidden = mode != .voice
+        } else {
+            pendingInsertButton.isHidden = true
+            pendingInsertButton.accessibilityValue = nil
         }
     }
 
@@ -340,7 +356,19 @@ final class KeyboardView: UIView {
             self.delegate?.keyboardOpenHostTapped(cta)
         }, for: .touchUpInside)
 
-        let micWrap = UIStackView(arrangedSubviews: [ctaButton, holdHint, micButton, waveform])
+
+        pendingInsertButton.translatesAutoresizingMaskIntoConstraints = false
+        pendingInsertButton.layer.cornerRadius = 18
+        pendingInsertButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+        pendingInsertButton.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
+        let insertCfg = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+        pendingInsertButton.setImage(UIImage(systemName: "doc.on.clipboard", withConfiguration: insertCfg), for: .normal)
+        pendingInsertButton.isHidden = true
+        pendingInsertButton.addAction(UIAction { [weak self] _ in
+            self?.delegate?.keyboardInsertPendingResultTapped()
+        }, for: .touchUpInside)
+
+        let micWrap = UIStackView(arrangedSubviews: [ctaButton, pendingInsertButton, holdHint, micButton, waveform])
         micWrap.axis = .vertical
         micWrap.alignment = .center
         micWrap.spacing = 12
@@ -353,6 +381,9 @@ final class KeyboardView: UIView {
             ctaButton.heightAnchor.constraint(equalToConstant: 36),
             ctaButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
             ctaButton.widthAnchor.constraint(lessThanOrEqualTo: voiceStack.widthAnchor, multiplier: 0.96),
+            pendingInsertButton.heightAnchor.constraint(equalToConstant: 36),
+            pendingInsertButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 180),
+            pendingInsertButton.widthAnchor.constraint(lessThanOrEqualTo: voiceStack.widthAnchor, multiplier: 0.96),
             micButton.widthAnchor.constraint(equalTo: voiceStack.widthAnchor, multiplier: 0.72),
             micButton.heightAnchor.constraint(equalToConstant: 56),
             waveform.widthAnchor.constraint(equalTo: voiceStack.widthAnchor, multiplier: 0.55),
@@ -587,6 +618,9 @@ final class KeyboardView: UIView {
         ctaButton.backgroundColor = p.chromeFill
         ctaButton.tintColor = p.chromeFg
         ctaButton.setTitleColor(p.chromeFg, for: .normal)
+        pendingInsertButton.backgroundColor = .systemBlue
+        pendingInsertButton.tintColor = .white
+        pendingInsertButton.setTitleColor(.white, for: .normal)
 
         for btn in [voiceGlobe, voiceBackspace, voiceAt] {
             btn.backgroundColor = p.chromeFill

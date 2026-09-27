@@ -23,7 +23,12 @@ public enum AppGroupConstants {
     public static let recordingLevelKey = "recording.level"
     public static let lastResultTextKey = "result.text"
     public static let lastResultIDKey = "result.id"
+    public static let lastResultAtKey = "result.publishedAt"
+    /// Keyboard writes the last successfully inserted result id (durable across extension wakes).
+    public static let lastInsertedResultIDKey = "result.lastInsertedID"
     public static let lastErrorKey = "result.error"
+    /// File name inside the App Group container — survives UserDefaults cross-process lag.
+    public static let pendingResultFileName = "pending-result.json"
     public static let statusMessageKey = "status.message"
     public static let settingsSpeechModelKey = "settings.speechModel"
     public static let settingsPolishModelKey = "settings.polishModel"

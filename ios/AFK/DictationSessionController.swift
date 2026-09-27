@@ -1,3 +1,4 @@
+import OSLog
 import AVFoundation
 import Combine
 import Foundation
@@ -19,6 +20,7 @@ import UIKit
 /// "open AFK once" CTA; the next foreground visit re-arms.
 @MainActor
 final class DictationSessionController: ObservableObject {
+    private static let relayLog = Logger(subsystem: "xyz.yuchenlin.afk.ios", category: "relay")
     @Published var settings: IOSSettings = .load()
     @Published var isSessionActive = false
     @Published var isRecording = false
@@ -557,6 +559,7 @@ final class DictationSessionController: ObservableObject {
                 text = (try? await mock.polish(text, model: settings.polishModel, apiKey: nil)) ?? text
             }
             lastTranscript = text
+            Self.relayLog.info("publishResult len=\(text.count)")
             relay.publishResult(text)
             setStatus(isSessionActive ? readyStatus : "Ready")
             UIPasteboard.general.string = text

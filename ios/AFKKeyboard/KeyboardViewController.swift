@@ -1,10 +1,12 @@
 import UIKit
+import OSLog
 
 /// AFK Keyboard — Typeless-like voice-first UI; typing via ABC / 中文; host records via App Group.
 /// Mic never opens `afk://` / foregrounds the host. Press-and-hold (or tap, tap) asks the
 /// backgrounded host to unmute its armed mic for that one utterance; when the host cannot, an
 /// in-keyboard CTA asks the user to open AFK once.
 final class KeyboardViewController: UIInputViewController {
+    private static let log = Logger(subsystem: "xyz.yuchenlin.afk.ios.keyboard", category: "insert")
     private var keyboardView: KeyboardView!
     private let relay = SessionRelay.shared
     private var shiftOn = false
@@ -20,6 +22,14 @@ final class KeyboardViewController: UIInputViewController {
     private var activeCTA: HostCTA?
     private var lastCTAOpenAt: Date?
     private var lastPingFlushAt = Date.distantPast
+    /// True between willAppear and willDisappear. Darwin can fire while disappearing;
+    /// `insertText` then silently no-ops and a consume would permanently drop the result.
+    private var keyboardVisible = false
+    /// Set in viewDidAppear — textDocumentProxy is not reliably ready in willAppear.
+    private var insertReady = false
+    /// Last peeked result kept for the in-keyboard "Tap to insert" fallback.
+    private var pendingPasteText: String?
+    private var awaitingStartedAt: Date?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -56,26 +66,52 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        keyboardVisible = true
+        insertReady = false
         activeCTA = nil
+        // Restore durable inserted-id so we do not re-insert after extension relaunch.
+        if let stored = relay.defaults.string(forKey: AppGroupConstants.lastInsertedResultIDKey) {
+            lastInsertedResultID = stored
+        }
         refreshFullAccessState()
         keyboardView.reloadPolishFromDefaults()
+        // If a result is already sitting in App Group (missed Darwin / we were backgrounded),
+        // surface it in chrome immediately — actual insert waits for didAppear.
+        if let pending = relay.peekResult() {
+            pendingPasteText = pending.text
+            awaitingResult = true
+            awaitingStartedAt = awaitingStartedAt ?? Date()
+        }
         refreshChrome()
-        consumeResultIfNeeded()
         startPolling()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        keyboardVisible = true
+        insertReady = true
+        // Proxy is ready — drain any durable pending result now.
+        consumeResultIfNeeded()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        keyboardVisible = false
+        insertReady = false
         pollTimer?.invalidate()
         pollTimer = nil
         // Never leave the host mic open behind a hidden keyboard. Once stop is posted
         // (`awaitingResult`), leave it: cancel would overwrite it and drop the dictation.
-        if canUseAppGroup, !awaitingResult, relay.isRecording || pendingStartCommandID != nil {
+        let hasPendingResult = relay.peekResult() != nil
+        if canUseAppGroup, !awaitingResult, !hasPendingResult,
+           relay.isRecording || pendingStartCommandID != nil {
             _ = relay.postCommand(.cancel)
         }
         pendingStartCommandID = nil
         startWatchDeadline = nil
-        awaitingResult = false
+        // CRITICAL: do NOT clear awaitingResult here. STT often finishes after the keyboard
+        // is dismissed; clearing was a primary intermittent drop. Durable App Group +
+        // viewDidAppear / next poll drain it.
         keyboardView.resetMicGesture()
     }
 
@@ -97,6 +133,7 @@ final class KeyboardViewController: UIInputViewController {
             self?.refreshChrome()
             self?.consumeResultIfNeeded()
             self?.watchPendingStart()
+            self?.watchAwaitingTimeout()
         }
         if let pollTimer {
             RunLoop.main.add(pollTimer, forMode: .common)
@@ -141,9 +178,15 @@ final class KeyboardViewController: UIInputViewController {
             if activeCTA == nil || activeCTA == .startSession {
                 activeCTA = .sessionExpired
             }
-            if awaitingResult {
-                awaitingResult = false
-                keyboardView.flash("AFK stopped — reopen to resume")
+            // Host heartbeat gone — but a result may already be in App Group. Drain it first.
+            if awaitingResult || relay.peekResult() != nil || pendingPasteText != nil {
+                consumeResultIfNeeded()
+                if relay.peekResult() == nil, pendingPasteText == nil {
+                    awaitingResult = false
+                    if keyboardVisible {
+                        keyboardView.flash("AFK stopped — reopen to resume")
+                    }
+                }
             }
         }
         // Host dropped the utterance (interruption, cap, cancel) while tap-to-speak was latched.
@@ -163,8 +206,15 @@ final class KeyboardViewController: UIInputViewController {
         )
         if recording {
             keyboardView.setPreview("Listening…")
+            keyboardView.setPendingInsert(nil)
+        } else if let pending = pendingPasteText, !pending.isEmpty {
+            keyboardView.setPreview(pending)
+            keyboardView.setPendingInsert(pending)
         } else if awaitingResult {
             keyboardView.setPreview(hostStatus.isEmpty ? "Transcribing…" : hostStatus)
+            keyboardView.setPendingInsert(nil)
+        } else {
+            keyboardView.setPendingInsert(nil)
         }
     }
 
@@ -173,7 +223,9 @@ final class KeyboardViewController: UIInputViewController {
         if let err = relay.lastError {
             keyboardView.flash(err)
             keyboardView.setPreview(nil)
+            keyboardView.setPendingInsert(nil)
             awaitingResult = false
+            pendingPasteText = nil
             pendingStartCommandID = nil
             startWatchDeadline = nil
             keyboardView.resetMicGesture()
@@ -181,19 +233,135 @@ final class KeyboardViewController: UIInputViewController {
             refreshChrome()
             return
         }
-        guard let result = relay.consumeResult() else { return }
-        if result.id == lastInsertedResultID { return }
-        lastInsertedResultID = result.id
-        textDocumentProxy.insertText(result.text)
-        keyboardView.setPreview(result.text)
+
+        guard let result = relay.peekResult() else {
+            return
+        }
+        Self.log.info("peek result id=\(result.id, privacy: .public) len=\(result.text.count) visible=\(self.keyboardVisible)")
+        if result.id == lastInsertedResultID {
+            relay.acknowledgeResult(id: result.id)
+            return
+        }
+
+        // Stash for the "Tap to insert" fallback even if we cannot insert right now.
+        pendingPasteText = result.text
+        awaitingResult = true
+        if awaitingStartedAt == nil { awaitingStartedAt = Date() }
+
+        guard insertReady, keyboardVisible, isViewLoaded, view.window != nil else {
+            keyboardView.setPreview(result.text)
+            keyboardView.setPendingInsert(result.text)
+            refreshChrome()
+            return
+        }
+
+        insertPendingResult(source: "auto")
+    }
+
+    /// Insert the peeked / pending result into the host text field, then ack App Group.
+    /// Only call while the keyboard is visible — otherwise leave App Group intact.
+    @discardableResult
+    private func insertPendingResult(source: String) -> Bool {
+        let peeked = relay.peekResult()
+        let text: String
+        let id: String?
+        if let peeked {
+            if peeked.id == lastInsertedResultID {
+                relay.acknowledgeResult(id: peeked.id)
+                clearPendingInsertUI()
+                return true
+            }
+            text = peeked.text
+            id = peeked.id
+        } else if let pending = pendingPasteText, !pending.isEmpty {
+            text = pending
+            id = nil
+        } else if let clip = UIPasteboard.general.string, !clip.isEmpty, awaitingResult || source == "tap" {
+            // Host always mirrors publishResult onto the pasteboard.
+            text = clip
+            id = nil
+        } else {
+            return false
+        }
+
+        guard insertReady, keyboardVisible, isViewLoaded, view.window != nil else {
+            Self.log.info("defer insert (not ready) source=\(source, privacy: .public) len=\(text.count)")
+            pendingPasteText = text
+            keyboardView.setPreview(text)
+            keyboardView.setPendingInsert(text)
+            return false
+        }
+
+        Self.log.info("insertText source=\(source, privacy: .public) len=\(text.count) proxy=\(String(describing: type(of: self.textDocumentProxy)), privacy: .public)")
+        // Trust insertText while we are the active keyboard. documentContext* is unreliable
+        // (nil for secure fields, truncated otherwise) and must not gate ack — a failed
+        // verification would leave the result in App Group and the 0.2s poll would
+        // double-insert.
+        textDocumentProxy.insertText(text)
+        Self.log.info("insertText done; ack id=\(id ?? "nil", privacy: .public)")
+        if let id {
+            lastInsertedResultID = id
+            relay.acknowledgeResult(id: id)
+        } else if let peekedID = peeked?.id {
+            lastInsertedResultID = peekedID
+            relay.acknowledgeResult(id: peekedID)
+        }
+        // Keep a local copy briefly so the user can tap "Insert result" again if the
+        // host field somehow ignored insertText (rare). Also ensure pasteboard has it.
+        if UIPasteboard.general.string != text {
+            UIPasteboard.general.string = text
+        }
+        clearPendingInsertUI()
+        keyboardView.setPreview(text)
         keyboardView.flash("Inserted")
-        awaitingResult = false
+        // Keep a short-lived "Insert result" affordance in case the host field ignored
+        // insertText; tap re-inserts from local/clipboard without needing App Group.
+        if source == "auto" {
+            pendingPasteText = text
+            keyboardView.setPendingInsert(text)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
+                guard let self else { return }
+                if self.pendingPasteText == text {
+                    self.pendingPasteText = nil
+                    self.keyboardView.setPendingInsert(nil)
+                    self.keyboardView.setPreview(nil)
+                }
+            }
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.keyboardView.setPreview(nil)
+            }
+        }
         pendingStartCommandID = nil
         startWatchDeadline = nil
         refreshChrome()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            self?.keyboardView.setPreview(nil)
+        return true
+    }
+
+    private func clearPendingInsertUI() {
+        awaitingResult = false
+        awaitingStartedAt = nil
+        pendingPasteText = nil
+        keyboardView.setPendingInsert(nil)
+    }
+
+    /// Give up the "Transcribing…" chrome after a long wait, but NEVER delete a durable
+    /// App Group result — peek/appear/tap can still insert it.
+    private func watchAwaitingTimeout() {
+        guard awaitingResult, let started = awaitingStartedAt else { return }
+        guard Date().timeIntervalSince(started) > 90 else { return }
+        if relay.peekResult() != nil {
+            // Result is there — keep trying; just nudge the user.
+            keyboardView.setPendingInsert(pendingPasteText ?? relay.peekResult()?.text)
+            keyboardView.flash("Still have a result — tap Insert")
+            awaitingStartedAt = Date() // re-arm nudge, don't clear
+            return
         }
+        awaitingResult = false
+        awaitingStartedAt = nil
+        keyboardView.flash("Transcription timed out — try again")
+        keyboardView.setPreview(nil)
+        refreshChrome()
     }
 
     /// After posting start, confirm host actually opened the mic; never auto-open host.
@@ -278,6 +446,7 @@ final class KeyboardViewController: UIInputViewController {
         guard relay.isRecording || pendingStartCommandID != nil else { return }
         _ = relay.postCommand(.stop)
         awaitingResult = true
+        awaitingStartedAt = Date()
         pendingStartCommandID = nil
         startWatchDeadline = nil
         keyboardView.flash("Transcribing…")
@@ -359,6 +528,10 @@ extension KeyboardViewController: KeyboardViewDelegate {
 
     func keyboardOpenHostTapped(_ cta: HostCTA) {
         openHostFromCTA(cta)
+    }
+
+    func keyboardInsertPendingResultTapped() {
+        _ = insertPendingResult(source: "tap")
     }
 
     func keyboardSwitchToVoice() {

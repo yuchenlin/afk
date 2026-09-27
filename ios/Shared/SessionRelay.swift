@@ -183,11 +183,16 @@ public final class SessionRelay {
 
     public func publishResult(_ text: String) {
         let id = UUID().uuidString
+        let at = Date().timeIntervalSince1970
         defaults.set(text, forKey: AppGroupConstants.lastResultTextKey)
         defaults.set(id, forKey: AppGroupConstants.lastResultIDKey)
+        defaults.set(at, forKey: AppGroupConstants.lastResultAtKey)
         defaults.removeObject(forKey: AppGroupConstants.lastErrorKey)
+        // New utterance must be insertable even if a prior id was acknowledged.
+        // (lastInsertedID stays — peek compares against it.)
         defaults.set(0 as Float, forKey: AppGroupConstants.recordingLevelKey)
         defaults.synchronize()
+        writePendingResultFile(id: id, text: text, at: at)
         DarwinNotify.post(AppGroupConstants.noteResultReady)
     }
 
@@ -198,14 +203,80 @@ public final class SessionRelay {
         DarwinNotify.post(AppGroupConstants.noteResultReady)
     }
 
-    public func consumeResult() -> (id: String, text: String)? {
-        guard let id = defaults.string(forKey: AppGroupConstants.lastResultIDKey),
-              let text = defaults.string(forKey: AppGroupConstants.lastResultTextKey),
-              !id.isEmpty else { return nil }
-        defaults.removeObject(forKey: AppGroupConstants.lastResultIDKey)
-        defaults.removeObject(forKey: AppGroupConstants.lastResultTextKey)
+    /// Read the pending result without deleting it. Returns nil once `acknowledgeResult`
+    /// has recorded the same id as inserted. Falls back to the App Group file when
+    /// UserDefaults has not yet mirrored the host write into this process.
+    public func peekResult() -> (id: String, text: String)? {
         defaults.synchronize()
-        return (id, text)
+        let inserted = defaults.string(forKey: AppGroupConstants.lastInsertedResultIDKey)
+        if let id = defaults.string(forKey: AppGroupConstants.lastResultIDKey),
+           let text = defaults.string(forKey: AppGroupConstants.lastResultTextKey),
+           !id.isEmpty, !text.isEmpty, id != inserted {
+            return (id, text)
+        }
+        // Cross-process UD lag / extension cold start — try the durable file.
+        if let file = readPendingResultFile(), file.id != inserted, !file.text.isEmpty {
+            // Mirror into UD so subsequent peeks/polls are cheap.
+            defaults.set(file.text, forKey: AppGroupConstants.lastResultTextKey)
+            defaults.set(file.id, forKey: AppGroupConstants.lastResultIDKey)
+            defaults.set(file.at, forKey: AppGroupConstants.lastResultAtKey)
+            defaults.synchronize()
+            return (file.id, file.text)
+        }
+        return nil
+    }
+
+    /// Mark a result as inserted. Keeps text/id in UD+file for diagnostics, but peek
+    /// will skip it. Never silently deletes a successful STT before the keyboard acks.
+    public func acknowledgeResult(id: String) {
+        defaults.set(id, forKey: AppGroupConstants.lastInsertedResultIDKey)
+        // Clear the "pending" markers so chrome stops showing Transcribing, but leave
+        // a copy in the file until the next publish overwrites it.
+        if defaults.string(forKey: AppGroupConstants.lastResultIDKey) == id {
+            defaults.removeObject(forKey: AppGroupConstants.lastResultIDKey)
+            defaults.removeObject(forKey: AppGroupConstants.lastResultTextKey)
+            defaults.removeObject(forKey: AppGroupConstants.lastResultAtKey)
+        }
+        defaults.synchronize()
+        clearPendingResultFile(matching: id)
+    }
+
+    /// Peek + acknowledge in one step. Prefer peek/acknowledge when insert may fail.
+    public func consumeResult() -> (id: String, text: String)? {
+        guard let result = peekResult() else { return nil }
+        acknowledgeResult(id: result.id)
+        return result
+    }
+
+    // MARK: - Durable pending-result file (App Group container)
+
+    private var pendingResultFileURL: URL? {
+        FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: suiteName)?
+            .appendingPathComponent(AppGroupConstants.pendingResultFileName)
+    }
+
+    private func writePendingResultFile(id: String, text: String, at: TimeInterval) {
+        guard let url = pendingResultFileURL else { return }
+        let payload: [String: Any] = ["id": id, "text": text, "at": at]
+        guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]) else { return }
+        try? data.write(to: url, options: [.atomic])
+    }
+
+    private func readPendingResultFile() -> (id: String, text: String, at: TimeInterval)? {
+        guard let url = pendingResultFileURL,
+              let data = try? Data(contentsOf: url),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let id = obj["id"] as? String, !id.isEmpty,
+              let text = obj["text"] as? String, !text.isEmpty else { return nil }
+        let at = (obj["at"] as? TimeInterval) ?? 0
+        return (id, text, at)
+    }
+
+    private func clearPendingResultFile(matching id: String) {
+        guard let url = pendingResultFileURL else { return }
+        if let current = readPendingResultFile(), current.id != id { return }
+        try? FileManager.default.removeItem(at: url)
     }
 
     public var lastError: String? {
