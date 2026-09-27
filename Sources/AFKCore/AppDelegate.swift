@@ -71,6 +71,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
     private var historyItem: NSMenuItem!
     private var outputItem: NSMenuItem!
     private var apiItem: NSMenuItem!
+    /// iCloud KVS vocabulary remote-change observer (retained for process lifetime).
+    private var vocabularyiCloudObserver: NSObjectProtocol?
+
 
     private var hotkey: Hotkey { keyMonitor.hotkey }
     private var isRecordingShortcut: Bool { recordingTimeoutWork != nil }
@@ -118,6 +121,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
                 guard let self, self.enabled else { return }
                 _ = self.startListening()
             }
+        }
+
+        // iCloud KVS vocabulary: pull remote (LWW) then watch for other-device edits.
+        syncVocabularyFromiCloud()
+        vocabularyiCloudObserver = VocabularyStore.observeExternalChanges { [weak self] in
+            Task { @MainActor in self?.syncVocabularyFromiCloud() }
         }
     }
 
@@ -877,6 +886,19 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         refreshVocabularyMenu()
         sttLog.info("vocabulary saved: \(newLexicon.keyTermsForStt.count, privacy: .public) key terms")
         overlay.showDone("Vocabulary saved: \(newLexicon.keyTermsForStt.count) terms, used from the next recording")
+    }
+
+    /// Pull iCloud KVS vocabulary when newer than local (last-writer-wins on whole text).
+    private func syncVocabularyFromiCloud() {
+        let changed = VocabularyStore.pullFromiCloudIfNewer()
+        let loaded = VocabularyStore.load()
+        if changed || loaded != lexicon {
+            lexicon = loaded
+            refreshVocabularyMenu()
+            if changed {
+                sttLog.info("vocabulary pulled from iCloud: \(loaded.keyTermsForStt.count, privacy: .public) key terms")
+            }
+        }
     }
 
     /// Accessory apps have no visible menu bar, but text fields still need the standard

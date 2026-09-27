@@ -147,7 +147,7 @@ scripts/local-whisper.sh [base|small|large-v3-turbo-q5_0]
 5. 菜单 → **快捷键** → 选择 ⌘G（默认）或 Fn，或 **录制新快捷键…**（Esc 取消）。自定义快捷键需含 ⌘、⌃ 或 ⌥，除非是 F 键；选择会跨启动持久保存
 6. 菜单 → **说话模式**：**按住说话**（默认）或 **免提** — 轻点开始，再点结束，Esc 取消；按住仍可作为按住说话。可选 **停顿后自动停止**：约 2.5 秒无新词则结束（10 秒无语音则放弃；免提最长 5 分钟）
 7. 菜单 → **输出**：**润色**（默认）将转写送入聊天模型，去掉语气词（um、you know、嗯、呃）、口吃与假起头，并修正标点，但不改写内容。**原文**则粘贴听到的内容。若润色失败或过慢（4 秒），会粘贴原文并由胶囊说明原因。历史会保留两个版本。
-8. 菜单 → **词汇表…**：自有词与短语，每行一个（人名、产品名、术语）。作为关键词发送（最多 100 条，每条 ≤ 50 字符），以便按你写的方式识别与拼写。保存在 `~/Library/Application Support/AFK/lexicon.txt`
+8. 菜单 → **词汇表…**：自有词与短语，每行一个（人名、产品名、术语）。作为关键词发送（最多 100 条，每条 ≤ 50 字符），以便按你写的方式识别与拼写。保存在 `~/Library/Application Support/AFK/lexicon.txt`，并在可用时经 iCloud KVS 同步到 iPhone
 9. 菜单 → **麦克风**：系统默认或指定输入；选择会持久保存，设备拔出时回退到默认
 10. 菜单 → **历史… (N)**：每条转写含时间、目标应用与长度，最新在前。可搜索、**复制**、**粘贴到上一应用**、**删除**、**全部清除…**。仅保存在本地 `~/Library/Application Support/AFK/history.json`（权限 600）
 11. 菜单 → **设置…**（⌘,）：分别为语音转写与润色选择**服务商与模型**，粘贴 API 密钥（掩码显示），并**测试**两者。密钥缺失或被拒时菜单显示 ⚠️
@@ -159,7 +159,8 @@ scripts/local-whisper.sh [base|small|large-v3-turbo-q5_0]
 - **纯本地路径：** 本地 Whisper（语音）+ Ollama（润色）— 音频与文字留在本机。
 - **云端服务商：** 选择 xAI、OpenRouter 或 OpenAI 时，音频（及润色文本）会发送到该服务商的 API。AFK 不运营代理；你自带密钥（BYOK）。
 - **密钥：** 永不编入二进制。从环境变量或 Application Support 下权限为 `600` 的文件读取（或在 **设置…** 中粘贴）。正式 App Store 构建应使用钥匙串 + 同意界面（见 [docs/RELEASE_PLAN.md](docs/RELEASE_PLAN.md)）。
-- **历史 / 词汇表：** 仅保存在 Application Support 本地磁盘；AFK 不会上传。
+- **历史：** 仅保存在 Application Support 本地磁盘；AFK 不会上传。
+- **词汇表：** 本地保存（Mac Application Support / iOS App Group），并在已登录同一 Apple ID 时通过 **iCloud 键值存储**（`afk.vocabularyText`）与 iPhone 同步；整表最后写入胜出。未登录 iCloud 时仅本地。
 
 ## 贡献
 

@@ -95,7 +95,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Vocabulary")
                 } footer: {
-                    Text("One word or phrase per line (names, jargon, e.g. GRPO, Hotshot). Sent to Grok as STT key terms and polish hints. Lines starting with # are comments. Max \(IOSLexicon.maxKeyTerms) terms, ≤\(IOSLexicon.maxTermLength) characters each.")
+                    Text("One word or phrase per line (names, jargon, e.g. GRPO, Hotshot). Sent to Grok as STT key terms and polish hints. Lines starting with # are comments. Max \(IOSLexicon.maxKeyTerms) terms, ≤\(IOSLexicon.maxTermLength) characters each. Syncs with Mac via iCloud (same Apple ID); last save wins for the whole list. Without iCloud, stays on this device only.")
                 }
 
                 Section {
@@ -126,6 +126,7 @@ struct SettingsView: View {
                 }
             }
             .onAppear {
+                _ = IOSVocabulary.pullFromiCloudIfNewer()
                 vocabularyText = IOSVocabulary.loadText()
             }
         }

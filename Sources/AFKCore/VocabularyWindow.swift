@@ -69,7 +69,7 @@ private struct VocabularyEditorView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Custom Vocabulary")
                 .font(.headline)
-            Text("One word or phrase per line: names, product terms, jargon (e.g. GRPO, Hotshot, 宇辰). AFK sends them to Grok as key terms so they're recognized and spelled exactly as written. Lines starting with # are comments.")
+            Text("One word or phrase per line: names, product terms, jargon (e.g. GRPO, Hotshot, 宇辰). AFK sends them to Grok as key terms so they're recognized and spelled exactly as written. Lines starting with # are comments. Syncs with iPhone via iCloud (same Apple ID); last save wins for the whole list.")
                 .font(.callout)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

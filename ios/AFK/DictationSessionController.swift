@@ -43,6 +43,7 @@ final class DictationSessionController: ObservableObject {
     private let polisher = SimplePolisher()
     private var sessionTimer: Timer?
     private var commandPollTimer: Timer?
+    private var vocabularyiCloudObserver: NSObjectProtocol?
     private let heartbeatQueue = DispatchQueue(label: "xyz.yuchenlin.afk.heartbeat", qos: .userInitiated)
     private var heartbeat: DispatchSourceTimer?
     private let blockedFlag = LockedFlag()
@@ -107,9 +108,22 @@ final class DictationSessionController: ObservableObject {
         })
     }
 
+
+    /// Start once: pull + observe iCloud KVS vocabulary changes from Mac / other devices.
+    func startVocabularyiCloudObserverIfNeeded() {
+        guard vocabularyiCloudObserver == nil else { return }
+        _ = IOSVocabulary.pullFromiCloudIfNewer()
+        vocabularyiCloudObserver = IOSVocabulary.observeExternalChanges {
+            _ = IOSVocabulary.pullFromiCloudIfNewer()
+        }
+    }
+
     deinit {
         darwinObservers.forEach { DarwinNotify.stop($0) }
         observers.forEach { NotificationCenter.default.removeObserver($0) }
+        if let vocabularyiCloudObserver {
+            NotificationCenter.default.removeObserver(vocabularyiCloudObserver)
+        }
         commandPollTimer?.invalidate()
         heartbeat?.cancel()
     }

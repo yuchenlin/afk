@@ -69,7 +69,8 @@ Mock STT is **off by default**. Paste an xAI key in Settings for live `grok-voic
 | Host unreachable / armed engine lost → in-keyboard "Open AFK once" CTA | ✅ only deliberate tap opens `afk://session` |
 | Full Mac Polisher / lexicon / streaming Grok | ⚠️ polish+keyterms aligned (build 12); streaming still deferred |
 | STT Mac↔iOS audit | ✅ [`docs/IOS_STT_AUDIT.md`](../docs/IOS_STT_AUDIT.md) |
-| Live Activity / Control Center / iCloud | ❌ TODO |
+| Live Activity / Control Center | ❌ TODO |
+| Vocabulary iCloud KVS sync (Mac ↔ iOS) | ✅ build 14 (`afk.vocabularyText`, LWW) |
 | App Store assets / consent / privacy policy | ❌ not claimed |
 
 ## Regenerate project

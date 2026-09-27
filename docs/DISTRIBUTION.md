@@ -183,3 +183,22 @@ Until the first notarized asset exists, the README should say Releases are comin
 - [RELEASE_PLAN.md](RELEASE_PLAN.md) — open source checklist, App Store vs direct, iOS
 - `scripts/make-dmg.sh` — DMG packaging only (no notarization)
 - `scripts/check-signing.sh` / `make signing-status` — read-only: Development vs Developer ID vs notary profile
+
+## Vocabulary sync (Mac ↔ iOS)
+
+AFK mirrors the ≤100-term vocabulary via **iCloud Key-Value Store** (not CloudKit documents):
+
+| Item | Value |
+|---|---|
+| KVS keys | `afk.vocabularyText`, `afk.vocabularyUpdatedAt` |
+| Shared store id | `$(TeamIdentifierPrefix)xyz.yuchenlin.afk` → `6FQUWPKXD8.xyz.yuchenlin.afk` |
+| Mac local | `~/Library/Application Support/AFK/lexicon.txt` |
+| iOS local | App Group `group.xyz.yuchenlin.afk` (`settings.vocabularyText`) — keyboard still reads App Group only |
+| Merge | **Last-writer-wins** on the whole text (timestamp key) |
+| Entitlements | Host iOS + Mac; keyboard extension does **not** need KVS |
+| Offline / no iCloud | Local-only; no error surfacing |
+
+**User must:** sign into the **same Apple ID** with iCloud enabled on both Mac and iPhone (Settings → [Name] → iCloud). First launch after upgrade pulls/pushes once; later edits propagate via `NSUbiquitousKeyValueStoreDidChangeExternallyNotification`.
+
+Rebuilds: Mac **0.1.2** (build 4) and iOS build **14** include this. Enable **iCloud → Key-value storage** on App IDs `xyz.yuchenlin.afk` (Mac) and `xyz.yuchenlin.afk.ios` (host) in the developer portal if Xcode/automatic signing has not already.
+

@@ -54,7 +54,8 @@ Constraint: custom keyboards can't use the microphone, so the main app records a
   - [x] Background "session" in the main app (5 / 15 / 60 min setting, mic indicator visible) — *basic audio session*
   - [x] Start/stop via Darwin notifications, text hand-off via App Group, insert with `textDocumentProxy`
   - [ ] Verify how the keyboard can start a session (opening the app from a keyboard is a review gray area)
-- [ ] **Phase 4** — optional iCloud (CloudKit) sync of vocabulary and history between Mac and iPhone
+- [x] **Phase 4a** — iCloud **KVS** vocabulary sync Mac ↔ iPhone (`afk.vocabularyText`, LWW) — build 14 / Mac 0.1.2
+- [ ] **Phase 4b** — optional CloudKit sync of history (and richer lexicon if needed) between Mac and iPhone
 - [ ] **Phase 5** — App Store submission: consent flow, privacy policy, screenshots
 - [ ] Consider an on-device option (WhisperKit / whisper.cpp) for privacy and offline use
 

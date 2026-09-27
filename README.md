@@ -147,7 +147,7 @@ With Local Whisper + Ollama, nothing leaves the Mac; AFK preloads the Ollama mod
 5. Menu → **Shortcut** → pick ⌘G (default) or Fn, or **Record New Shortcut…** (Esc cancels). Custom shortcuts need ⌘, ⌃ or ⌥ unless they're F-keys; the choice persists across launches
 6. Menu → **Talk Mode**: **Hold to Talk** (default) or **Hands-Free** — tap to start, tap again to finish, Esc cancels; holding still works as push-to-talk. Optional **Auto-Stop After a Pause** finishes once no new words arrive for 2.5 s (gives up after 10 s with no speech; hands-free recordings cap at 5 min)
 7. Menu → **Output**: **Polished** (default) sends the transcript through a chat model to remove fillers (um, you know, 嗯, 呃), stutters, and false starts, and to fix punctuation, without rewording. **Original** pastes exactly what was heard. If polishing fails or is too slow (4 s), the original is pasted and the pill says why. History keeps both versions.
-8. Menu → **Vocabulary…**: your own words and phrases, one per line (names, product terms, jargon). They're sent as key terms (max 100, each ≤ 50 characters) so they're recognized and spelled as written. Stored in `~/Library/Application Support/AFK/lexicon.txt`
+8. Menu → **Vocabulary…**: your own words and phrases, one per line (names, product terms, jargon). They're sent as key terms (max 100, each ≤ 50 characters) so they're recognized and spelled as written. Stored in `~/Library/Application Support/AFK/lexicon.txt` and synced to iPhone via iCloud KVS when available
 9. Menu → **Microphone**: System Default or a specific input; the choice persists and falls back to the default if that device is unplugged
 10. Menu → **History… (N)**: every transcript with time, target app, and length, newest first. Search, **Copy**, **Paste into Previous App**, **Delete**, and **Clear All…**. Saved locally in `~/Library/Application Support/AFK/history.json` (mode 600)
 11. Menu → **Settings…** (⌘,): choose a **provider and model** separately for speech-to-text and polish, paste API keys (masked), and **Test** both. The menu shows ⚠️ when a key is missing or rejected
@@ -159,7 +159,8 @@ With Local Whisper + Ollama, nothing leaves the Mac; AFK preloads the Ollama mod
 - **Local-only path:** Local Whisper (speech) + Ollama (polish) — audio and text stay on your Mac.
 - **Cloud providers:** when you choose xAI, OpenRouter, or OpenAI, audio (and polish text) is sent to that provider’s API. AFK does not operate a proxy; you bring your own key (BYOK).
 - **Keys:** never compiled into the binary. Read from the environment or from mode-`600` files under Application Support (or paste in **Settings…**). Production App Store builds should use Keychain + a consent screen (see [docs/RELEASE_PLAN.md](docs/RELEASE_PLAN.md)).
-- **History / vocabulary:** stored only on disk under Application Support; not uploaded by AFK.
+- **History:** stored only on disk under Application Support; not uploaded by AFK.
+- **Vocabulary:** stored locally (Mac Application Support / iOS App Group) and optionally mirrored to **iCloud Key-Value Store** (`afk.vocabularyText`) so Mac and iPhone share the same list when signed into the same Apple ID. Last save wins for the whole text. Without iCloud, stays local-only.
 
 ## Contributing
 
