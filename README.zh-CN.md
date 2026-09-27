@@ -34,7 +34,7 @@
 
 ### 1. 推荐：GitHub Releases DMG
 
-从 [GitHub Releases](https://github.com/yuchenlin/afk/releases/tag/v0.1.0) 下载 **[AFK-0.1.0.dmg](https://github.com/yuchenlin/afk/releases/download/v0.1.0/AFK-0.1.0.dmg)**（Developer ID 签名、Apple 公证并已装订）。打开磁盘映像，将 **AFK.app** 拖入 **应用程序**。
+从 [GitHub Releases](https://github.com/yuchenlin/afk/releases/tag/v0.1.1) 下载 **[AFK-0.1.1.dmg](https://github.com/yuchenlin/afk/releases/download/v0.1.1/AFK-0.1.1.dmg)**（Developer ID 签名、Apple 公证并已装订）。打开磁盘映像，将 **AFK.app** 拖入 **应用程序**。
 
 后续版本见 [全部 Releases](https://github.com/yuchenlin/afk/releases)。自行打包：`make dmg` → `dist/AFK-VERSION.dmg` — 详见 [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)（英文）。
 

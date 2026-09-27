@@ -34,7 +34,7 @@ See [docs/PRIOR_ART.md](docs/PRIOR_ART.md). Fn + paste adapted from [Scribe](htt
 
 ### 1. Preferred: GitHub Releases DMG
 
-Download **[AFK-0.1.0.dmg](https://github.com/yuchenlin/afk/releases/download/v0.1.0/AFK-0.1.0.dmg)** from [GitHub Releases](https://github.com/yuchenlin/afk/releases/tag/v0.1.0) (Developer ID signed, Apple notarized, stapled). Open the disk image and drag **AFK.app** into **Applications**.
+Download **[AFK-0.1.1.dmg](https://github.com/yuchenlin/afk/releases/download/v0.1.1/AFK-0.1.1.dmg)** from [GitHub Releases](https://github.com/yuchenlin/afk/releases/tag/v0.1.1) (Developer ID signed, Apple notarized, stapled). Open the disk image and drag **AFK.app** into **Applications**.
 
 Later versions: [all Releases](https://github.com/yuchenlin/afk/releases). To package a DMG yourself: `make dmg` → `dist/AFK-VERSION.dmg` — see [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
 
