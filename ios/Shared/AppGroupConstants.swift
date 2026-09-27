@@ -33,7 +33,7 @@ public enum AppGroupConstants {
     public static let settingsAutoStartSessionKey = "settings.autoStartSession"
 
     /// Keyboard → host command channel (survives missed Darwin notifies).
-    /// Values: "" | "start" | "stop"
+    /// Values: "" | "start" | "stop" | "cancel"
     public static let commandActionKey = "command.action"
     public static let commandIDKey = "command.id"
     public static let commandAtKey = "command.at"
@@ -43,8 +43,12 @@ public enum AppGroupConstants {
     /// to detect a suspended/dead host even when session.active is still true.
     public static let hostHeartbeatAtKey = "host.heartbeatAt"
     public static let hostAliveKey = "host.alive"
-    /// Host mic engine is running and delivering buffers (hot mic). Written with the heartbeat.
-    public static let hostMicLiveKey = "host.micLive"
+    /// Host has no armed (muted) mic engine — iOS stopped it or refused to start it — so a
+    /// keyboard hold cannot work until AFK is opened once. Written with the heartbeat.
+    public static let hostMicBlockedKey = "host.micBlocked"
+    /// Keyboard writes wall-clock (~5 Hz) while it is visible and an utterance is open.
+    /// The host closes the mic when this goes stale (keyboard dismissed or killed mid-hold).
+    public static let keyboardPingAtKey = "keyboard.pingAt"
 
     // Full Access handshake (host writes challenge; keyboard with Full Access echoes)
     public static let fullAccessHostChallengeKey = "fullAccess.hostChallenge"

@@ -4,11 +4,11 @@ import Foundation
 public struct IOSSettings: Sendable {
     public var speechModel: String
     public var polishModel: String
-    /// Idle minutes before the session mic turns off (reset by each dictation).
+    /// Idle minutes before the session (background playback) ends; reset by each dictation.
     public var sessionMinutes: Int
     public var useMockSTT: Bool
     public var polishEnabled: Bool
-    /// Start the session mic whenever AFK comes to the foreground.
+    /// Start the session whenever AFK comes to the foreground.
     public var autoStartSession: Bool
 
     public static let `default` = IOSSettings(

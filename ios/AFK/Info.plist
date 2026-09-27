@@ -23,7 +23,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>During a dictation session AFK keeps the microphone ready so the AFK Keyboard can turn your speech into text in any app (custom keyboards cannot use the microphone themselves). Audio is only kept while you use the keyboard mic.</string>
+	<string>AFK turns your speech into text for the AFK Keyboard in any app (custom keyboards cannot use the microphone themselves). AFK keeps the microphone muted during a session and unmutes it only while you hold the keyboard mic or tap to talk.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

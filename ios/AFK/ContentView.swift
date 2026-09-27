@@ -14,23 +14,16 @@ struct ContentView: View {
                     .multilineTextAlignment(.center)
 
                 if session.isSessionActive {
-                    VStack(spacing: 8) {
-                        Text(session.micLive
-                             ? "Mic ready — switch to any app and use the AFK keyboard. Ends after \(session.settings.sessionMinutes) min without dictation."
-                             : "iOS paused the mic — tap Resume mic while AFK is open")
-                            .font(.caption)
-                            .foregroundStyle(session.micLive ? .green : .orange)
-                            .multilineTextAlignment(.center)
-                        if !session.micLive {
-                            Button("Resume mic") { session.resumeMic() }
-                                .buttonStyle(.borderedProminent)
-                                .tint(.orange)
-                        }
-                    }
-                    .padding(.horizontal)
+                    Text(session.micBlocked
+                         ? "The mic could not start (a call or another app may be using it). AFK retries while it is open."
+                         : "Session on — switch to any app and hold the AFK keyboard mic to talk. The mic stays muted, with no orange indicator, except while you hold it. Ends after \(session.settings.sessionMinutes) min without dictation.")
+                        .font(.caption)
+                        .foregroundStyle(session.micBlocked ? .orange : .green)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
 
-                if session.openedFromKeyboard, session.micLive {
+                if session.openedFromKeyboard, session.isSessionActive {
                     Label("Session started. Tap ◀ at the top-left (or swipe right along the bottom edge) to go back and dictate.", systemImage: "arrow.uturn.backward.circle.fill")
                         .font(.subheadline.weight(.semibold))
                         .padding()
@@ -116,13 +109,7 @@ struct ContentView: View {
 
     private var recordButton: some View {
         Button {
-            Task {
-                if session.isRecording {
-                    await session.stopRecordingAndTranscribe()
-                } else {
-                    try? await session.startRecording()
-                }
-            }
+            Task { await session.toggleRecordingFromHost() }
         } label: {
             ZStack {
                 Circle()

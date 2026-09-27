@@ -63,7 +63,7 @@ struct SettingsView: View {
                 Section {
                     Toggle("Start session when AFK opens", isOn: $session.settings.autoStartSession)
                     Stepper(
-                        "Turn mic off after \(session.settings.sessionMinutes) min idle",
+                        "End session after \(session.settings.sessionMinutes) min idle",
                         value: $session.settings.sessionMinutes,
                         in: 5...120,
                         step: 5
@@ -71,7 +71,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Keyboard session")
                 } footer: {
-                    Text("During a session AFK keeps the microphone ready (orange indicator) so the AFK Keyboard can dictate in any app without switching back. Audio is only kept while you use the keyboard mic. Each dictation resets the idle timer.")
+                    Text("During a session AFK stays running in the background (silent audio playback) with the mic muted, so the AFK Keyboard can dictate in any app. The mic unmutes only while you hold the keyboard mic (or between your two taps) and mutes again when you let go. Each dictation resets the idle timer.")
                 }
 
                 if let saveMessage {

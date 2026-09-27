@@ -24,6 +24,8 @@ public final class SessionRelay {
     public enum Command: String {
         case start
         case stop
+        /// Close the mic and drop the utterance (keyboard dismissed mid-hold).
+        case cancel
     }
 
     /// Keyboard view of host liveness from App Group heartbeat.
@@ -124,9 +126,24 @@ public final class SessionRelay {
         defaults.synchronize()
         switch command {
         case .start: DarwinNotify.post(AppGroupConstants.noteStartRecording)
-        case .stop: DarwinNotify.post(AppGroupConstants.noteStopRecording)
+        case .stop, .cancel: DarwinNotify.post(AppGroupConstants.noteStopRecording)
         }
         return id
+    }
+
+    /// Keyboard: "still here" while an utterance is open, so the host never leaves the
+    /// mic open after the keyboard vanishes without sending stop. `flush` pushes it to the
+    /// host process at once (callers throttle it).
+    public func touchKeyboardPing(flush: Bool) {
+        defaults.set(Date().timeIntervalSince1970, forKey: AppGroupConstants.keyboardPingAtKey)
+        if flush { defaults.synchronize() }
+    }
+
+    /// Host: seconds since the keyboard last pinged (`.infinity` if never).
+    public var secondsSinceKeyboardPing: TimeInterval {
+        let t = defaults.double(forKey: AppGroupConstants.keyboardPingAtKey)
+        guard t > 0 else { return .infinity }
+        return Date().timeIntervalSince1970 - t
     }
 
     /// Host: take the next unconsumed keyboard command, if any.
@@ -201,28 +218,28 @@ public final class SessionRelay {
     }
 
     /// Host: mark process as alive (1 Hz background-queue heartbeat).
-    /// `micLive` = session mic engine is delivering buffers, so a keyboard start will work
-    /// without foregrounding the host. Posts `noteSessionChanged` only when it flips.
+    /// `micBlocked` = the host has no armed mic engine (iOS stopped it or refused to start
+    /// it), so the next hold needs one trip to AFK. Posts `noteSessionChanged` only when it flips.
     /// `flush` forces the shared suite out so the keyboard process sees it at once.
-    public func touchHostHeartbeat(alive: Bool = true, micLive: Bool, flush: Bool = false) {
-        let wasLive = defaults.bool(forKey: AppGroupConstants.hostMicLiveKey)
+    public func touchHostHeartbeat(alive: Bool = true, micBlocked: Bool, flush: Bool = false) {
+        let wasBlocked = defaults.bool(forKey: AppGroupConstants.hostMicBlockedKey)
         defaults.set(alive, forKey: AppGroupConstants.hostAliveKey)
-        defaults.set(micLive, forKey: AppGroupConstants.hostMicLiveKey)
+        defaults.set(micBlocked, forKey: AppGroupConstants.hostMicBlockedKey)
         defaults.set(Date().timeIntervalSince1970, forKey: AppGroupConstants.hostHeartbeatAtKey)
-        if flush || wasLive != micLive { defaults.synchronize() }
-        if wasLive != micLive { DarwinNotify.post(AppGroupConstants.noteSessionChanged) }
+        if flush || wasBlocked != micBlocked { defaults.synchronize() }
+        if wasBlocked != micBlocked { DarwinNotify.post(AppGroupConstants.noteSessionChanged) }
     }
 
     public func clearHostHeartbeat() {
         defaults.set(false, forKey: AppGroupConstants.hostAliveKey)
-        defaults.set(false, forKey: AppGroupConstants.hostMicLiveKey)
+        defaults.set(false, forKey: AppGroupConstants.hostMicBlockedKey)
         defaults.set(0.0, forKey: AppGroupConstants.hostHeartbeatAtKey)
         defaults.synchronize()
     }
 
-    /// Keyboard: host's session mic engine is running (last heartbeat said so).
-    public var hostMicLive: Bool {
-        defaults.bool(forKey: AppGroupConstants.hostMicLiveKey)
+    /// Keyboard: the host has no armed mic engine (last heartbeat said so).
+    public var hostMicBlocked: Bool {
+        defaults.bool(forKey: AppGroupConstants.hostMicBlockedKey)
     }
 
     /// Keyboard: true if host wrote a heartbeat within `maxAge` seconds.
@@ -250,25 +267,26 @@ public final class SessionRelay {
     }
 }
 
-/// In-keyboard call-to-action when the host session mic is not ready.
+/// In-keyboard call-to-action when the host cannot take a keyboard hold.
 /// Mic never opens the host; only a deliberate tap on this CTA may.
 public enum HostCTA: Equatable {
     /// No session yet.
     case startSession
     /// Session flag set but host heartbeat is gone (suspended / killed).
     case sessionExpired
-    /// Host alive but iOS stopped its mic (call, Siri, route change) — needs foreground to restart.
+    /// Host alive but iOS stopped its muted mic engine (call, Siri, route change) — restarting
+    /// it needs one foreground visit.
     case recoverHost
 
     public var title: String {
         switch self {
         case .startSession: return "Open AFK once to start session"
         case .sessionExpired: return "Session paused — open AFK once"
-        case .recoverHost: return "Mic paused by iOS — open AFK once"
+        case .recoverHost: return "Mic off — open AFK once to turn it on"
         }
     }
 
-    /// All CTAs (re)start the session mic in the foreground, then the user swipes back.
+    /// All CTAs (re)start the session in the foreground, then the user swipes back.
     public var urlPath: String { AppGroupConstants.urlHostSession }
 }
 

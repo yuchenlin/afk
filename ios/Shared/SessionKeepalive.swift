@@ -1,16 +1,18 @@
 import AVFoundation
 import Foundation
 
-/// Backup background-audio assertion for a dictation session.
+/// Owns the shared `AVAudioSession` for a dictation session and keeps AFK running in the
+/// background with a near-silent looping sine (`UIBackgroundModes: audio`).
 ///
-/// The primary assertion is the session-long mic engine in `AudioCapture` (recording keeps
-/// the host running under `UIBackgroundModes: audio`). This near-silent loop runs beside it
-/// so the process stays alive long enough to publish state if iOS stops the mic
-/// (interruption / route change). It is never paused for capture.
+/// The category is `.playAndRecord` + `.mixWithOthers` for the whole session and must be set
+/// while AFK is foreground: from the background iOS refuses both a category switch into a
+/// record category (`!int`, 560557684) and a fresh mic start, so `AudioCapture` arms its muted
+/// engine on this session at the same time. Mixable, so other apps' audio keeps playing and a
+/// background reactivation (after an interruption) is allowed. `.allowBluetoothA2DP` keeps
+/// AirPods in music quality for the whole session (input comes from the iPhone mic).
+/// `.defaultToSpeaker` keeps mixed audio on the speaker when no headphones are connected.
 ///
-/// The session must stay **mixable** (`.mixWithOthers`). Activating a non-mixable session
-/// while backgrounded throws OSStatus 560557684 (`!int` = CannotInterruptOthers). Pure
-/// digital silence is treated as "not playing" on some iOS builds — we emit a near-silent sine.
+/// Pure digital silence is treated as "not playing" on some iOS builds — hence the sine.
 @MainActor
 public final class SessionKeepalive {
     private var player: AVAudioPlayer?
@@ -19,25 +21,29 @@ public final class SessionKeepalive {
 
     public var isRunning: Bool { player?.isPlaying == true }
 
-    /// Shared mixable category used by keepalive and capture so background
-    /// reactivation never hits CannotInterruptOthers. `.default` mode (not `.voiceChat`)
-    /// so a session-long hot mic does not switch other apps to call-style volume.
-    public static func activateMixableSession() throws {
+    private static let options: AVAudioSession.CategoryOptions = [.mixWithOthers, .allowBluetoothA2DP, .defaultToSpeaker]
+
+    /// Activate the session and start (or resume) the loop.
+    public func start() throws {
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(
-            .playAndRecord,
-            mode: .default,
-            options: [.mixWithOthers, .allowBluetoothHFP, .defaultToSpeaker]
-        )
+        if session.category != .playAndRecord || session.mode != .default || session.categoryOptions != Self.options {
+            try session.setCategory(.playAndRecord, mode: .default, options: Self.options)
+        }
         try session.setActive(true)
+        try ensurePlaying()
     }
 
-    public func start() throws {
-        if isRunning { return }
-        try Self.activateMixableSession()
+    public func stop() {
+        player?.stop()
+        player = nil
+    }
 
-        let data = Self.nearSilentSineWav(sampleRate: 16_000, seconds: 1.0, frequency: 40, amplitude: 0.002)
-        let player = try AVAudioPlayer(data: data)
+    private func ensurePlaying() throws {
+        if let player {
+            if player.isPlaying { return }
+            if player.play() { return }
+        }
+        let player = try AVAudioPlayer(data: Self.nearSilentSineWav(sampleRate: 16_000, seconds: 1.0, frequency: 40, amplitude: 0.002))
         // Non-zero volume + non-zero PCM — volume 0 / all-zero buffers are ignored
         // by the background-audio assertion on some iOS builds.
         player.volume = 0.05
@@ -47,11 +53,6 @@ public final class SessionKeepalive {
             throw AudioCapture.CaptureError.engineStart("Silent keepalive failed to play")
         }
         self.player = player
-    }
-
-    public func stop() {
-        player?.stop()
-        player = nil
     }
 
     /// Near-silent PCM16 mono WAV (tiny sine, not digital zero).

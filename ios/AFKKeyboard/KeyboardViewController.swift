@@ -1,8 +1,9 @@
 import UIKit
 
 /// AFK Keyboard — Typeless-like voice-first UI; typing via ABC / 中文; host records via App Group.
-/// Mic never opens `afk://` / foregrounds the host. The host's session mic (started once in
-/// the foreground) must be live; otherwise an in-keyboard CTA asks the user to open AFK once.
+/// Mic never opens `afk://` / foregrounds the host. Press-and-hold (or tap, tap) asks the
+/// backgrounded host to unmute its armed mic for that one utterance; when the host cannot, an
+/// in-keyboard CTA asks the user to open AFK once.
 final class KeyboardViewController: UIInputViewController {
     private var keyboardView: KeyboardView!
     private let relay = SessionRelay.shared
@@ -18,6 +19,7 @@ final class KeyboardViewController: UIInputViewController {
     /// In-keyboard CTA only; mic path never auto-opens the host.
     private var activeCTA: HostCTA?
     private var lastCTAOpenAt: Date?
+    private var lastPingFlushAt = Date.distantPast
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -65,6 +67,15 @@ final class KeyboardViewController: UIInputViewController {
         super.viewWillDisappear(animated)
         pollTimer?.invalidate()
         pollTimer = nil
+        // Never leave the host mic open behind a hidden keyboard. Once stop is posted
+        // (`awaitingResult`), leave it: cancel would overwrite it and drop the dictation.
+        if canUseAppGroup, !awaitingResult, relay.isRecording || pendingStartCommandID != nil {
+            _ = relay.postCommand(.cancel)
+        }
+        pendingStartCommandID = nil
+        startWatchDeadline = nil
+        awaitingResult = false
+        keyboardView.resetMicGesture()
     }
 
     /// Prefer UIKit `hasFullAccess`, then App Group container + RW probe.
@@ -81,6 +92,7 @@ final class KeyboardViewController: UIInputViewController {
     private func startPolling() {
         pollTimer?.invalidate()
         pollTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            self?.pingIfUtteranceOpen()
             self?.refreshChrome()
             self?.consumeResultIfNeeded()
             self?.watchPendingStart()
@@ -90,9 +102,23 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
-    /// Host alive (fresh heartbeat) but its session mic stopped — iOS needs AFK foreground to restart it.
-    private func hostMicPaused(health: SessionRelay.HostHealth) -> Bool {
-        health == .ready && !relay.hostMicLive
+    /// Host alive but its muted mic engine is gone — one foreground visit re-arms it.
+    private func hostMicBlocked(health: SessionRelay.HostHealth) -> Bool {
+        health != .down && relay.hostMicBlocked
+    }
+
+    /// Host closes the mic if these stop (keyboard killed mid-hold without sending stop).
+    private func pingIfUtteranceOpen() {
+        guard canUseAppGroup else { return }
+        if pendingStartCommandID != nil || relay.isRecording || keyboardView.isMicLatched {
+            ping()
+        }
+    }
+
+    private func ping() {
+        let flush = Date().timeIntervalSince(lastPingFlushAt) >= 0.5
+        if flush { lastPingFlushAt = Date() }
+        relay.touchKeyboardPing(flush: flush)
     }
 
     private func refreshChrome() {
@@ -101,12 +127,12 @@ final class KeyboardViewController: UIInputViewController {
         let level = relay.recordingLevel
         let hostStatus = relay.statusMessage
         let health = relay.hostHealth()
-        let micPaused = sessionOn && hostMicPaused(health: health)
+        let micBlocked = sessionOn && hostMicBlocked(health: health)
 
         // Clear CTA once host is healthy again.
-        if sessionOn, health == .ready, !micPaused {
+        if sessionOn, health == .ready, !micBlocked {
             activeCTA = nil
-        } else if micPaused, !recording {
+        } else if micBlocked, !recording {
             activeCTA = .recoverHost
         } else if !sessionOn {
             activeCTA = canUseAppGroup ? .startSession : nil
@@ -119,6 +145,10 @@ final class KeyboardViewController: UIInputViewController {
                 keyboardView.flash("AFK stopped — reopen to resume")
             }
         }
+        // Host dropped the utterance (interruption, cap, cancel) while tap-to-speak was latched.
+        if keyboardView.isMicLatched, !recording, pendingStartCommandID == nil, !awaitingResult {
+            keyboardView.resetMicGesture()
+        }
 
         keyboardView.setStatus(
             sessionOn: sessionOn,
@@ -127,7 +157,7 @@ final class KeyboardViewController: UIInputViewController {
             level: level,
             hostStatus: hostStatus,
             health: health,
-            micLive: !micPaused,
+            micBlocked: micBlocked,
             cta: needsFullAccessBanner ? nil : activeCTA
         )
         if recording {
@@ -145,6 +175,7 @@ final class KeyboardViewController: UIInputViewController {
             awaitingResult = false
             pendingStartCommandID = nil
             startWatchDeadline = nil
+            keyboardView.resetMicGesture()
             relay.clearError()
             refreshChrome()
             return
@@ -164,7 +195,7 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
-    /// After posting start, confirm host actually began recording; never auto-open host.
+    /// After posting start, confirm host actually opened the mic; never auto-open host.
     private func watchPendingStart() {
         guard let deadline = startWatchDeadline, let cmdID = pendingStartCommandID else { return }
         if relay.isRecording {
@@ -182,6 +213,8 @@ final class KeyboardViewController: UIInputViewController {
         pendingStartCommandID = nil
         startWatchDeadline = nil
         relay.clearPendingCommand()
+        keyboardView.resetMicGesture()
+        awaitingResult = false
 
         let health = relay.hostHealth()
         if health == .down {
@@ -190,7 +223,7 @@ final class KeyboardViewController: UIInputViewController {
             activeCTA = .sessionExpired
         } else {
             keyboardView.flash("AFK mic did not start")
-            keyboardView.setPreview("Open AFK once to resume mic")
+            keyboardView.setPreview("Open AFK once, then come back")
             activeCTA = .recoverHost
         }
         refreshChrome()
@@ -198,10 +231,12 @@ final class KeyboardViewController: UIInputViewController {
 
     private func requestStartRecording() {
         guard canUseAppGroup else {
+            keyboardView.resetMicGesture()
             keyboardView.flash("Enable Full Access + open AFK app")
             return
         }
         if !relay.isSessionActive {
+            keyboardView.resetMicGesture()
             activeCTA = .startSession
             keyboardView.flash("Open AFK once to start a session")
             keyboardView.setPreview("Start session in AFK")
@@ -210,21 +245,18 @@ final class KeyboardViewController: UIInputViewController {
         }
         let health = relay.hostHealth()
         if health == .down {
+            keyboardView.resetMicGesture()
             activeCTA = .sessionExpired
             keyboardView.flash("Session paused — open AFK once")
             keyboardView.setPreview("Open AFK to resume")
             refreshChrome()
             return
         }
-        if hostMicPaused(health: health) {
-            activeCTA = .recoverHost
-            keyboardView.flash("iOS paused the AFK mic")
-            keyboardView.setPreview("Open AFK once to resume mic")
-            refreshChrome()
-            return
-        }
-        // .ready or .degraded: App Group only — never openURL.
-        if relay.isRecording { return }
+        // .ready or .degraded: App Group only — never openURL. A blocked host still gets the
+        // command so the keyboard shows its exact error.
+        if relay.isRecording || pendingStartCommandID != nil { return }
+        lastPingFlushAt = .distantPast
+        ping()
         let id = relay.postCommand(.start)
         pendingStartCommandID = id
         startWatchDeadline = Date().addingTimeInterval(2.0)
@@ -250,25 +282,6 @@ final class KeyboardViewController: UIInputViewController {
         keyboardView.flash("Transcribing…")
         keyboardView.setPreview("Transcribing…")
         refreshChrome()
-    }
-
-    private func toggleRecording() {
-        guard canUseAppGroup else {
-            keyboardView.flash("Enable Full Access + open AFK app")
-            return
-        }
-        if !relay.isSessionActive {
-            activeCTA = .startSession
-            keyboardView.flash("Open AFK once to start a session")
-            keyboardView.setPreview("Start session in AFK")
-            refreshChrome()
-            return
-        }
-        if relay.isRecording {
-            requestStopRecording()
-        } else {
-            requestStartRecording()
-        }
     }
 
     /// Deliberate CTA tap only — the sole keyboard path that may open `afk://`.
@@ -335,16 +348,12 @@ extension KeyboardViewController: KeyboardViewDelegate {
         keyboardView.setShift(shiftOn)
     }
 
-    func keyboardMicHoldBegan() {
+    func keyboardMicStart() {
         requestStartRecording()
     }
 
-    func keyboardMicHoldEnded() {
+    func keyboardMicStop() {
         requestStopRecording()
-    }
-
-    func keyboardMicTapped() {
-        toggleRecording()
     }
 
     func keyboardOpenHostTapped(_ cta: HostCTA) {

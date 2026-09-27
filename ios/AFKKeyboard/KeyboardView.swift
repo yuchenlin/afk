@@ -7,11 +7,10 @@ protocol KeyboardViewDelegate: AnyObject {
     func keyboardSpace()
     func keyboardNextKeyboard()
     func keyboardToggleShift()
-    /// Hold-to-talk / release-to-send (primary).
-    func keyboardMicHoldBegan()
-    func keyboardMicHoldEnded()
-    /// Clear tap start/stop when not using hold.
-    func keyboardMicTapped()
+    /// Mic touch-down (hold-to-talk or first tap of tap-to-speak): open the host mic now.
+    func keyboardMicStart()
+    /// Hold released, or second tap in tap-to-speak: close the mic and transcribe.
+    func keyboardMicStop()
     func keyboardSwitchToVoice()
     func keyboardSwitchToTypingEN()
     func keyboardSwitchToTypingCN()
@@ -37,7 +36,7 @@ final class KeyboardView: UIView {
     private let previewLabel = UILabel()
     private let contentHost = UIView()
 
-    // Voice chrome (Typeless-like: brand | modes · Tap to speak · pill mic · bottom chrome)
+    // Voice chrome (Typeless-like: brand | modes · hold/tap hint · pill mic · bottom chrome)
     private let voiceStack = UIStackView()
     private let headerBar = UIStackView()
     private let brandLabel = UILabel()
@@ -70,8 +69,12 @@ final class KeyboardView: UIView {
     private var pinyinBuffer = ""
     private var candidates: [String] = []
 
-    private var isHoldingMic = false
-    private var holdDidFire = false
+    /// Mic gesture: touch-down starts at once (no pre-roll exists, so waiting would clip the
+    /// first syllable). Release after `holdThreshold` = hold-to-talk → stop. A shorter touch
+    /// latches tap-to-speak; the next touch-down stops.
+    private enum MicGesture { case idle, pressing(since: Date), latched }
+    private var micGesture: MicGesture = .idle
+    private let holdThreshold: TimeInterval = 0.4
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -100,11 +103,12 @@ final class KeyboardView: UIView {
         level: Float,
         hostStatus: String,
         health: SessionRelay.HostHealth = .ready,
-        micLive: Bool = true,
+        micBlocked: Bool = false,
         cta: HostCTA? = nil
     ) {
         waveform.level = recording ? level : 0
         waveform.isHidden = !recording || mode != .voice
+        let sendHint = isMicLatched ? "Listening… tap to send" : "Listening… release to send"
 
         if needsFullAccess {
             statusLabel.text = "Full Access off · typing OK · dictation needs AFK app + Full Access"
@@ -113,10 +117,10 @@ final class KeyboardView: UIView {
             holdHint.text = "Enable Full Access"
             applyCTA(nil)
         } else if recording {
-            statusLabel.text = hostStatus.isEmpty ? "Listening… release to send" : hostStatus
+            statusLabel.text = hostStatus.isEmpty ? sendHint : hostStatus
             statusLabel.textColor = .systemRed
             styleMic(ready: true, recording: true)
-            holdHint.text = "Listening… release to send"
+            holdHint.text = sendHint
             applyCTA(nil)
         } else if sessionOn, health == .down {
             statusLabel.text = "Session paused · open AFK once to resume"
@@ -124,25 +128,25 @@ final class KeyboardView: UIView {
             styleMic(ready: false, recording: false)
             holdHint.text = "Open AFK to resume"
             applyCTA(cta ?? .sessionExpired)
-        } else if sessionOn, !micLive {
-            statusLabel.text = "iOS paused the AFK mic (call / Siri / audio change)"
+        } else if sessionOn, micBlocked {
+            statusLabel.text = "iOS turned the AFK mic off (call, Siri or audio change)"
             statusLabel.textColor = .systemOrange
             styleMic(ready: false, recording: false)
-            holdHint.text = "Open AFK once to resume"
+            holdHint.text = "Open AFK once to turn it back on"
             applyCTA(cta ?? .recoverHost)
         } else if sessionOn, health == .degraded {
             let base = hostStatus.isEmpty ? "Session on · waking…" : hostStatus
             statusLabel.text = base
             statusLabel.textColor = UIColor(white: 0.65, alpha: 1)
             styleMic(ready: true, recording: false)
-            holdHint.text = "Tap to speak"
+            holdHint.text = isMicLatched ? sendHint : "Hold to talk · or tap"
             applyCTA(cta)
         } else if sessionOn {
-            let base = hostStatus.isEmpty ? "Session on · hold mic to talk" : hostStatus
+            let base = hostStatus.isEmpty ? "Session on · mic muted until you hold" : hostStatus
             statusLabel.text = base
             statusLabel.textColor = UIColor(white: 0.65, alpha: 1)
             styleMic(ready: true, recording: false)
-            holdHint.text = "Tap to speak"
+            holdHint.text = isMicLatched ? sendHint : "Hold to talk · or tap"
             applyCTA(cta)
         } else {
             statusLabel.text = "No session · open AFK → Start dictation session"
@@ -246,7 +250,7 @@ final class KeyboardView: UIView {
         holdHint.font = .systemFont(ofSize: 15, weight: .medium)
         holdHint.textColor = UIColor(white: 0.7, alpha: 1)
         holdHint.textAlignment = .center
-        holdHint.text = "Tap to speak"
+        holdHint.text = "Hold to talk · or tap"
 
         // Large white pill mic (Typeless)
         micButton.translatesAutoresizingMaskIntoConstraints = false
@@ -256,12 +260,9 @@ final class KeyboardView: UIView {
         micButton.setImage(UIImage(systemName: "mic.fill", withConfiguration: micConfig), for: .normal)
         micButton.tintColor = .black
         micButton.backgroundColor = .white
-        micButton.accessibilityLabel = "Tap to speak"
+        micButton.accessibilityLabel = "Hold to talk, or tap to start and tap again to send"
         micButton.addTarget(self, action: #selector(micTouchDown), for: .touchDown)
         micButton.addTarget(self, action: #selector(micTouchUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
-        let tap = UITapGestureRecognizer(target: self, action: #selector(micTapRecognized))
-        tap.cancelsTouchesInView = false
-        micButton.addGestureRecognizer(tap)
 
         waveform.translatesAutoresizingMaskIntoConstraints = false
         waveform.isHidden = true
@@ -543,14 +544,10 @@ final class KeyboardView: UIView {
             micButton.backgroundColor = .systemRed
             micButton.tintColor = .white
             micButton.transform = CGAffineTransform(scaleX: 1.02, y: 1.02)
-            holdHint.text = "Listening… release to send"
         } else if ready {
             micButton.backgroundColor = .white
             micButton.tintColor = .black
             micButton.transform = .identity
-            if holdHint.text?.hasPrefix("Listening") == true || holdHint.text?.hasPrefix("Hold") == true || holdHint.text?.hasPrefix("Release") == true {
-                holdHint.text = "Tap to speak"
-            }
         } else {
             micButton.backgroundColor = UIColor(white: 0.35, alpha: 1)
             micButton.tintColor = UIColor(white: 0.75, alpha: 1)
@@ -561,29 +558,37 @@ final class KeyboardView: UIView {
     // MARK: - Mic gestures
 
     @objc private func micTouchDown() {
-        isHoldingMic = true
-        holdDidFire = false
-        // Start after a short threshold so a flick-tap can still be toggle.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
-            guard let self, self.isHoldingMic, !self.holdDidFire else { return }
-            self.holdDidFire = true
-            self.delegate?.keyboardMicHoldBegan()
+        switch micGesture {
+        case .latched:
+            micGesture = .idle
+            delegate?.keyboardMicStop()
+        case .idle, .pressing:
+            micGesture = .pressing(since: Date())
+            delegate?.keyboardMicStart()
         }
     }
 
     @objc private func micTouchUp() {
-        let wasHolding = isHoldingMic
-        let didHold = holdDidFire
-        isHoldingMic = false
-        if wasHolding, didHold {
-            delegate?.keyboardMicHoldEnded()
+        guard case let .pressing(since) = micGesture else { return }
+        if Date().timeIntervalSince(since) >= holdThreshold {
+            micGesture = .idle
+            delegate?.keyboardMicStop()
+        } else {
+            micGesture = .latched
+            holdHint.text = "Listening… tap to send"
         }
     }
 
-    @objc private func micTapRecognized() {
-        // If hold-to-talk already ran, ignore the tap.
-        guard !holdDidFire else { return }
-        delegate?.keyboardMicTapped()
+    /// Controller: the utterance ended outside the gesture (start refused, result/error in,
+    /// keyboard hidden). Next touch-down starts a new one.
+    func resetMicGesture() {
+        micGesture = .idle
+    }
+
+    /// True while a tap-to-speak utterance is waiting for its second tap.
+    var isMicLatched: Bool {
+        if case .latched = micGesture { return true }
+        return false
     }
 
     // MARK: - Key handling

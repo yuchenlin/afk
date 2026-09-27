@@ -54,7 +54,7 @@ struct OnboardingView: View {
                 }
 
                 Section("4. Start a session") {
-                    Text("Open AFK once (or tap “Open AFK once” in the keyboard). AFK starts a session and keeps the mic ready — the orange indicator stays on — so you can go back to any app and dictate from the AFK Keyboard without switching again. The session ends after the idle time set in Settings.")
+                    Text("Open AFK once (or tap “Open AFK once” in the keyboard). AFK starts a session and stays running in the background, so you can go back to any app and dictate from the AFK Keyboard: hold the mic while you talk, or tap to start and tap again to send. AFK keeps the mic muted (no orange indicator) and unmutes it only while you talk. The session ends after the idle time set in Settings.")
                         .font(.footnote)
                 }
             }
