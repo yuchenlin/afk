@@ -64,8 +64,9 @@ public enum ApiKeyStore {
                 return Loaded(key: fromEnv, source: .environment)
             }
         }
-        let fromFile = (keyFile?() ?? readKeyFile(for: provider))?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        // An injected reader replaces the real file entirely, so tests never read real keys.
+        let raw = keyFile.map { $0() } ?? readKeyFile(for: provider)
+        let fromFile = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !fromFile.isEmpty {
             return Loaded(key: fromFile, source: .keyFile)
         }

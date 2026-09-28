@@ -31,3 +31,6 @@ eval/recordings/
 
 # iOS local signing
 ios/Config/Signing.xcconfig
+
+# Provisioning profiles are account-specific
+*.provisionprofile

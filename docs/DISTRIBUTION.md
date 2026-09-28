@@ -105,10 +105,23 @@ codesign -d --entitlements - AFK.app | plutil -p -
 # expect: com.apple.security.device.audio-input = true
 ```
 
+### iCloud provisioning profile (required since 0.1.2)
+
+`Supporting/AFK.entitlements` also claims `com.apple.developer.ubiquity-kvstore-identifier` (vocabulary sync). That is a **restricted entitlement**: macOS refuses to launch an app that claims it without an embedded provisioning profile matching the signing certificate (`amfid`: "No matching profile found").
+
+One-time setup per signing Mac:
+
+1. developer.apple.com → Identifiers → **AFK Mac** (`xyz.yuchenlin.afk`) → check **iCloud** → Save. No iCloud container is needed (key-value storage only).
+2. Profiles → **+** → Distribution → **Developer ID** → App ID `xyz.yuchenlin.afk` → select **every Developer ID Application certificate that will sign releases** (one per Mac) → Generate → Download.
+3. Save it as `Supporting/AFK.provisionprofile` (git-ignored; account-specific).
+
+With the profile present, `make build`/`make install` sign with Developer ID and embed it, and `scripts/make-dmg.sh` embeds it before re-signing. Without it, both sign with `Supporting/AFK.local.entitlements` (no iCloud) so the app still launches, and vocabulary stays local. When adding a certificate (new Mac), edit the profile to include it and download again.
+
 ### What has / has not been tested
 
 - **Tested:** producing a UDZO DMG with `hdiutil` via `scripts/make-dmg.sh` / `make dmg` on a developer Mac (Apple Development–signed app inside).
-- **Not done:** **Developer ID Application** identity is not in the keychain yet; no notary keychain profile; no stapled Release asset. `make dmg` will auto-prefer Developer ID once that cert exists.
+- **Tested (Sep 28):** Developer ID–signed build with the iCloud profile embedded launches on a second Mac (LUS-M24409LGPT) and gets iCloud + microphone access.
+- **Not done on that Mac:** notary keychain profile (`xcrun notarytool store-credentials AFK-notary`), so no notarized/stapled DMG from it yet.
 
 ### Why Apple Development is not enough for strangers
 

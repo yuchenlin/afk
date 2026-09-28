@@ -33,10 +33,28 @@ DEV_ID_IDENTITY="$(
     | head -1
 )"
 
+# iCloud key-value storage is a restricted entitlement: macOS refuses to launch an app that
+# claims it without an embedded provisioning profile matching the signing certificate.
+PROVISIONING_PROFILE="${PROVISIONING_PROFILE:-Supporting/AFK.provisionprofile}"
+
 if [[ -n "$DEV_ID_IDENTITY" ]]; then
   echo "🔏 Re-signing $APP_BUNDLE with $DEV_ID_IDENTITY (Hardened Runtime)…"
-  ENTITLEMENTS="${ENTITLEMENTS:-Supporting/AFK.entitlements}"
+  if [[ -f "$PROVISIONING_PROFILE" ]]; then
+    cp "$PROVISIONING_PROFILE" "$APP_BUNDLE/Contents/embedded.provisionprofile"
+    ENTITLEMENTS="${ENTITLEMENTS:-Supporting/AFK.entitlements}"
+    echo "   Embedded $PROVISIONING_PROFILE (iCloud vocabulary sync on)"
+  else
+    rm -f "$APP_BUNDLE/Contents/embedded.provisionprofile"
+    ENTITLEMENTS="${ENTITLEMENTS:-Supporting/AFK.local.entitlements}"
+    echo "⚠️  No $PROVISIONING_PROFILE: signing without iCloud so the app still launches."
+    echo "   Download the Developer ID profile for xyz.yuchenlin.afk (see docs/DISTRIBUTION.md)."
+  fi
   codesign --force --deep --options runtime --entitlements "$ENTITLEMENTS" --sign "$DEV_ID_IDENTITY" "$APP_BUNDLE"
+  # Fail before packaging if the signature doesn't verify.
+  if ! codesign --verify --strict "$APP_BUNDLE" 2>/dev/null; then
+    echo "❌ $APP_BUNDLE failed codesign verification" >&2
+    exit 1
+  fi
   SIGN_KIND="Developer ID"
 else
   echo "ℹ️  No \"Developer ID Application\" identity in the keychain."

@@ -7,12 +7,22 @@ DEV_CERT := AFK Local Dev
 # Prefer a trusted "AFK Local Dev" identity (make dev-cert); else any Apple
 # Development identity; ad-hoc ("-") only for local ./AFK.app smoke tests —
 # `make install` refuses ad-hoc because it resets permissions every build.
+# With the Developer ID profile present (iCloud), sign with Developer ID: that profile only
+# accepts Developer ID certificates, and it gives local builds the same identity as releases.
 CODESIGN_IDENTITY ?= $(shell \
-	if security find-identity -v -p codesigning 2>/dev/null | grep -F '"$(DEV_CERT)"' >/dev/null; then \
+	if [ -f "Supporting/AFK.provisionprofile" ] && id=$$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p' | head -1) && [ -n "$$id" ]; then \
+		echo "$$id"; \
+	elif security find-identity -v -p codesigning 2>/dev/null | grep -F '"$(DEV_CERT)"' >/dev/null; then \
 		echo "$(DEV_CERT)"; \
 	elif id=$$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Apple Development:[^"]*\)".*/\1/p' | head -1); then \
 		test -n "$$id" && echo "$$id" || echo -; \
 	else echo -; fi)
+
+# iCloud vocabulary sync (Supporting/AFK.entitlements) needs a provisioning profile with
+# iCloud key-value storage. Put it at $(PROVISIONING_PROFILE) to embed it; without one,
+# builds use AFK.local.entitlements (no iCloud) so macOS still launches the app.
+PROVISIONING_PROFILE ?= Supporting/AFK.provisionprofile
+ENTITLEMENTS ?= $(if $(wildcard $(PROVISIONING_PROFILE)),Supporting/AFK.entitlements,Supporting/AFK.local.entitlements)
 
 .PHONY: build clean run install dmg dev-cert api-key icons check-sign signing-status
 
@@ -47,13 +57,19 @@ build:
 	cp Supporting/Info.plist $(APP_BUNDLE)/Contents/
 	cp Resources/lexicon.example.txt $(APP_BUNDLE)/Contents/Resources/lexicon.txt
 	cp Resources/AppIcon.icns $(APP_BUNDLE)/Contents/Resources/AppIcon.icns
+	@if [ -f "$(PROVISIONING_PROFILE)" ]; then \
+		cp "$(PROVISIONING_PROFILE)" $(APP_BUNDLE)/Contents/embedded.provisionprofile; \
+		echo "✅ Embedded $(PROVISIONING_PROFILE) (iCloud vocabulary sync on)"; \
+	else \
+		echo "ℹ️  No $(PROVISIONING_PROFILE): signing without iCloud (vocabulary stays local)"; \
+	fi
 	@id="$(CODESIGN_IDENTITY)"; \
 	if [ "$$id" = "-" ] || [ -z "$$id" ]; then \
 		echo "⚠️  Signing ad-hoc — Accessibility/Mic will reset on every rebuild."; \
 		echo "   Run \`make dev-cert\` (or use an Apple Development identity), then \`make install\`."; \
-		codesign --force --sign - --entitlements Supporting/AFK.entitlements $(APP_BUNDLE); \
+		codesign --force --sign - --entitlements $(ENTITLEMENTS) $(APP_BUNDLE); \
 	else \
-		codesign --force --sign "$$id" --entitlements Supporting/AFK.entitlements $(APP_BUNDLE); \
+		codesign --force --sign "$$id" --entitlements $(ENTITLEMENTS) $(APP_BUNDLE); \
 		echo "✅ Signed with $$id"; \
 	fi
 	@echo "✅ Built $(APP_BUNDLE)"
